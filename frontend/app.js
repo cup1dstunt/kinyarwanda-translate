@@ -8,6 +8,7 @@ const store = {
   del: (k) => { try { localStorage.removeItem(k); } catch { /* ignorieren */ } },
 };
 let password = store.get("pw");
+let serverTts = false;
 
 function setStatus(msg) { $("status").textContent = msg || ""; }
 
@@ -55,6 +56,7 @@ async function init() {
     fill($("provider"), info.providers);
     if (info.default) $("provider").value = info.default;
     $("provider").hidden = info.providers.length < 2;
+    serverTts = !!info.tts;
     showTab("translate");
     updateControls();
   } catch (e) { setStatus(e.message); }
@@ -109,16 +111,53 @@ function voicesFor(code) {
 function updateControls() {
   const src = $("source").value, tgt = $("target").value;
   $("count").textContent = `${$("input").value.length} / 2000`;
-  $("speak-in").disabled = !synth || !SPEECH_TAGS[src] || !$("input").value.trim();
-  $("speak").disabled = !synth || !SPEECH_TAGS[tgt] || !$("output").value.trim();
+  const canSpeak = serverTts || !!synth;
+  $("speak-in").disabled = !canSpeak || !SPEECH_TAGS[src] || !$("input").value.trim();
+  $("speak").disabled = !canSpeak || !SPEECH_TAGS[tgt] || !$("output").value.trim();
   $("go").disabled = !$("input").value.trim();
-  const voices = SPEECH_TAGS[tgt] ? voicesFor(tgt) : [];
+  const voices = SPEECH_TAGS[tgt] && !serverTts ? voicesFor(tgt) : [];
   $("voice").hidden = voices.length < 1;
   if (voices.length) {
     fill($("voice"), ["", ...voices.map((v) => v.name)], (n) => n || "Standardstimme");
     const saved = store.get("voice:" + tgt);
     $("voice").value = voices.some((v) => v.name === saved) ? saved : "";
   }
+}
+
+// Sprachausgabe über Google (Server): funktioniert auch in der installierten iOS-PWA,
+// in der die Browser-Sprachausgabe oft stumm bleibt. Browser-Stimmen nur als Rückfall.
+const SILENT_AUDIO = "data:audio/wav;base64,UklGRrQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YZABAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA"; // 50 ms Stille
+let audio = null;
+
+async function speakServer(text, code) {
+  // Element im Klick freischalten, sonst blockiert iOS das spätere play()
+  audio = audio || new Audio();
+  audio.src = SILENT_AUDIO;
+  audio.play().catch(() => {});
+  const res = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-App-Password": password },
+    body: JSON.stringify({ text, lang: code }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Fehler " + res.status);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  audio.src = url;
+  audio.onended = () => URL.revokeObjectURL(url);
+  await audio.play();
+}
+
+async function speakAny(text, code, voiceName) {
+  if (serverTts) {
+    setStatus("Lade Sprachausgabe …");
+    try { await speakServer(text, code); setStatus(""); } catch (e) {
+      setStatus("Sprachausgabe fehlgeschlagen: " + e.message + ". Ist die Text-to-Speech-API im Google-Projekt aktiviert?");
+    }
+    return;
+  }
+  speak(text, code, voiceName);
 }
 
 function speak(text, code, voiceName) {
@@ -149,8 +188,8 @@ function speak(text, code, voiceName) {
   attempt(true);
 }
 
-$("speak").onclick = () => speak($("output").value, $("target").value, $("voice").value);
-$("speak-in").onclick = () => speak($("input").value, $("source").value, "");
+$("speak").onclick = () => speakAny($("output").value, $("target").value, $("voice").value);
+$("speak-in").onclick = () => speakAny($("input").value, $("source").value, "");
 $("voice").onchange = () => store.set("voice:" + $("target").value, $("voice").value);
 $("input").oninput = updateControls;
 $("source").onchange = $("target").onchange = updateControls;

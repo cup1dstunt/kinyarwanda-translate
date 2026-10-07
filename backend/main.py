@@ -1,11 +1,11 @@
 import hmac
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import currency
+from . import currency, tts
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -25,6 +25,11 @@ class TranslateRequest(BaseModel):
     provider: str | None = None
 
 
+class SpeakRequest(BaseModel):
+    text: str
+    lang: str
+
+
 class ConvertRequest(BaseModel):
     amount: float
     source: str
@@ -39,7 +44,12 @@ def health():
 @app.get("/api/providers", dependencies=[Depends(require_password)])
 def providers():
     names = list(available_providers())
-    return {"providers": names, "default": names[0] if names else None, "languages": LANGUAGES}
+    return {
+        "providers": names,
+        "default": names[0] if names else None,
+        "languages": LANGUAGES,
+        "tts": bool(tts.api_key()),
+    }
 
 
 @app.post("/api/translate", dependencies=[Depends(require_password)])
@@ -61,6 +71,21 @@ def translate(req: TranslateRequest):
     try:
         return {"translation": provider.translate(text, req.source, req.target), "provider": name}
     except ProviderError as exc:
+        raise HTTPException(502, str(exc))
+
+
+@app.post("/api/tts", dependencies=[Depends(require_password)])
+def speak(req: SpeakRequest):
+    text = req.text.strip()
+    if not text:
+        raise HTTPException(400, "Kein Text")
+    if len(text) > max_input_chars():
+        raise HTTPException(413, f"Text zu lang (max. {max_input_chars()} Zeichen)")
+    if not tts.api_key():
+        raise HTTPException(503, "Kein Google-Key für die Sprachausgabe")
+    try:
+        return Response(tts.synthesize(text, req.lang), media_type="audio/mpeg")
+    except tts.TTSError as exc:
         raise HTTPException(502, str(exc))
 
 
