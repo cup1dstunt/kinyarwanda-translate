@@ -1,0 +1,8 @@
+services:
+  translator:
+    build: .
+    container_name: uebersetzer-pwa
+    env_file: .env
+    ports:
+      - "8085:8000"
+    restart: unless-stopped
