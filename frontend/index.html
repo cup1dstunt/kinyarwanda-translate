@@ -6,60 +6,97 @@
 <title>Übersetzer</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#1d4ed8">
+<meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Übersetzer">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <nav>
-    <button id="tab-translate" class="active">Übersetzen</button>
-    <button id="tab-currency">Währung</button>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 7h11m0 0-3-3m3 3-3 3M17 17H6m0 0 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Zm12.5-.5a4.5 4.5 0 0 1 0 6m2.5-8.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-clear" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-translate" viewBox="0 0 24 24"><path d="M4 5h9M8.5 3v2m2.5 0c0 4-3 7.5-6.5 9M6 9c1 2.5 3 4.5 5.5 5.5M13 21l4-10 4 10m-1.4-3.5h-5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-coins" viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14.5 7.2A5.5 5.5 0 1 1 8 17.7M9 7v4m-1.5-1.5h2.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="app">
+  <header class="appbar">
+    <h1>Übersetzer</h1>
+    <select id="provider" aria-label="Anbieter" hidden></select>
+  </header>
+
+  <main>
+    <section id="login" class="card login" hidden>
+      <h2>Anmelden</h2>
+      <input id="password" type="password" placeholder="Passwort" autocomplete="current-password">
+      <button id="login-btn" class="primary">Anmelden</button>
+    </section>
+
+    <section id="translate" class="view" hidden>
+      <div class="langbar">
+        <select id="source" aria-label="Von"></select>
+        <button id="swap" class="icon round" title="Sprachen tauschen" aria-label="Sprachen tauschen"><svg><use href="#i-swap"/></svg></button>
+        <select id="target" aria-label="Nach"></select>
+      </div>
+
+      <div class="panes">
+        <div class="card pane">
+          <textarea id="input" placeholder="Text eingeben oder per Diktat sprechen" maxlength="2000" aria-label="Text"></textarea>
+          <div class="pane-actions">
+            <small id="count">0 / 2000</small>
+            <span class="spacer"></span>
+            <button id="clear" class="icon" title="Löschen" aria-label="Löschen"><svg><use href="#i-clear"/></svg></button>
+            <button id="speak-in" class="icon" title="Vorlesen" aria-label="Eingabe vorlesen"><svg><use href="#i-speaker"/></svg></button>
+          </div>
+        </div>
+
+        <div class="card pane out">
+          <textarea id="output" readonly placeholder="Übersetzung" aria-label="Übersetzung"></textarea>
+          <div class="pane-actions">
+            <select id="voice" aria-label="Stimme" hidden></select>
+            <span class="spacer"></span>
+            <button id="copy" class="icon" title="Kopieren" aria-label="Kopieren"><svg><use href="#i-copy"/></svg></button>
+            <button id="speak" class="icon" title="Vorlesen" aria-label="Übersetzung vorlesen"><svg><use href="#i-speaker"/></svg></button>
+          </div>
+        </div>
+      </div>
+
+      <button id="go" class="primary big">Übersetzen</button>
+
+      <details id="history-box" class="card">
+        <summary>Verlauf</summary>
+        <ul id="history"></ul>
+        <button id="history-clear" class="ghost">Verlauf löschen</button>
+      </details>
+    </section>
+
+    <section id="currency" class="view" hidden>
+      <div class="card cur">
+        <input id="amount" type="number" inputmode="decimal" min="0" step="any" placeholder="Betrag" aria-label="Betrag">
+        <div class="langbar">
+          <select id="cur-from" aria-label="Von"><option>EUR</option><option>RWF</option></select>
+          <button id="cur-swap" class="icon round" title="Tauschen" aria-label="Währungen tauschen"><svg><use href="#i-swap"/></svg></button>
+          <select id="cur-to" aria-label="Nach"><option>RWF</option><option>EUR</option></select>
+        </div>
+        <button id="cur-go" class="primary big">Umrechnen</button>
+        <p id="cur-result" aria-live="polite"></p>
+        <small>Richtwert (Tageskurs). Wechselstuben in Ruanda weichen oft ab.</small>
+      </div>
+    </section>
+
+    <p id="status" role="status"></p>
+    <footer><small id="version"></small></footer>
+  </main>
+
+  <nav class="tabbar" id="tabbar" hidden>
+    <button id="tab-translate" class="active"><svg><use href="#i-translate"/></svg><span>Übersetzen</span></button>
+    <button id="tab-currency"><svg><use href="#i-coins"/></svg><span>Währung</span></button>
   </nav>
-
-  <section id="login" hidden>
-    <input id="password" type="password" placeholder="Passwort" autocomplete="current-password">
-    <button id="login-btn">Anmelden</button>
-  </section>
-
-  <section id="translate">
-    <div class="row">
-      <select id="source"></select>
-      <button id="swap" title="Sprachen tauschen">⇄</button>
-      <select id="target"></select>
-      <select id="provider"></select>
-    </div>
-    <textarea id="input" rows="5" placeholder="Text eingeben oder per Diktat sprechen" maxlength="2000"></textarea>
-    <button id="go">Übersetzen</button>
-    <textarea id="output" rows="5" readonly></textarea>
-    <div class="row">
-      <button id="copy">Kopieren</button>
-      <button id="speak">Vorlesen</button>
-    </div>
-    <select id="voice" hidden></select>
-    <details id="history-box">
-      <summary>Verlauf</summary>
-      <ul id="history"></ul>
-      <button id="history-clear">Verlauf löschen</button>
-    </details>
-  </section>
-
-  <section id="currency" hidden>
-    <div class="row">
-      <input id="amount" type="number" inputmode="decimal" min="0" step="any" placeholder="Betrag">
-      <select id="cur-from"><option>EUR</option><option>RWF</option></select>
-      <button id="cur-swap">⇄</button>
-      <select id="cur-to"><option>RWF</option><option>EUR</option></select>
-    </div>
-    <button id="cur-go">Umrechnen</button>
-    <p id="cur-result"></p>
-    <small>Richtwert (Tageskurs). Wechselstuben in Ruanda weichen oft ab.</small>
-  </section>
-
-  <p id="status" role="status"></p>
-  <footer><small id="version"></small></footer>
-</main>
+</div>
 <script src="app.js"></script>
 </body>
 </html>
