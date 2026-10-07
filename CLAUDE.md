@@ -27,5 +27,5 @@ Die vollständige Spezifikation steht in `docs/SPEC.md`. Bei Widersprüchen gilt
 - Antworten und Kommentare auf Deutsch, Code und Variablennamen auf Englisch.
 
 ## Befehle
-- Lokal starten: `docker compose up --build`
+- Lokal starten: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`
 - Tests: `pytest backend/tests`
