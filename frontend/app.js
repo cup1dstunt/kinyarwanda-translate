@@ -1,7 +1,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
-const LANG_LABELS = { de: "Deutsch", fr: "Français", rw: "Kinyarwanda" };
-const SPEECH_TAGS = { de: "de-DE", fr: "fr-FR" }; // Kinyarwanda bleibt Text
+const LANG_LABELS = { de: "Deutsch", fr: "Français", en: "English", rw: "Kinyarwanda" };
+const SPEECH_TAGS = { de: "de-DE", fr: "fr-FR", en: "en-US" }; // Kinyarwanda bleibt Text
 const store = {
   get: (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ohne Speicher: Anmeldung pro Start */ } },
@@ -57,6 +57,7 @@ async function init() {
     if (info.default) $("provider").value = info.default;
     $("provider").hidden = info.providers.length < 2;
     serverTts = !!info.tts;
+    $("ocr-btn").hidden = !info.ocr;
     showTab("translate");
     updateControls();
   } catch (e) { setStatus(e.message); }
@@ -194,6 +195,42 @@ $("voice").onchange = () => store.set("voice:" + $("target").value, $("voice").v
 $("input").oninput = updateControls;
 $("source").onchange = $("target").onchange = updateControls;
 if (synth) synth.onvoiceschanged = updateControls;
+
+// --- Texterkennung (Foto eines Schilds → Text → Übersetzung) ---
+const OCR_MAX_SIDE = 1600; // reicht für Schilder, hält Upload und Kosten klein
+
+function imageToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, OCR_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.8).split(",")[1]);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Bild konnte nicht gelesen werden")); };
+    img.src = url;
+  });
+}
+
+$("ocr-file").onchange = async () => {
+  const file = $("ocr-file").files[0];
+  $("ocr-file").value = "";
+  if (!file) return;
+  setStatus("Erkenne Text …");
+  try {
+    const r = await api("/api/ocr", { image: await imageToBase64(file) });
+    if (!r.text) { setStatus("Kein Text im Bild gefunden."); return; }
+    $("input").value = r.text;
+    $("output").value = "";
+    updateControls();
+    await translate();
+  } catch (e) { setStatus(e.message); }
+};
 
 // --- Tauschen ---
 $("swap").onclick = () => {

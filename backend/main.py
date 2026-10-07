@@ -5,7 +5,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import currency, tts
+from . import currency, ocr, tts
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -30,6 +30,10 @@ class SpeakRequest(BaseModel):
     lang: str
 
 
+class OCRRequest(BaseModel):
+    image: str  # Base64 ohne "data:"-Präfix
+
+
 class ConvertRequest(BaseModel):
     amount: float
     source: str
@@ -49,6 +53,7 @@ def providers():
         "default": names[0] if names else None,
         "languages": LANGUAGES,
         "tts": bool(tts.api_key()),
+        "ocr": bool(ocr.api_key()),
     }
 
 
@@ -87,6 +92,19 @@ def speak(req: SpeakRequest):
         return Response(tts.synthesize(text, req.lang), media_type="audio/mpeg")
     except tts.TTSError as exc:
         raise HTTPException(502, str(exc))
+
+
+@app.post("/api/ocr", dependencies=[Depends(require_password)])
+def recognize(req: OCRRequest):
+    if not req.image or len(req.image) > ocr.MAX_IMAGE_BASE64:
+        raise HTTPException(413, "Bild fehlt oder ist zu groß")
+    if not ocr.api_key():
+        raise HTTPException(503, "Kein Google-Key für die Texterkennung")
+    try:
+        text = ocr.detect_text(req.image)
+    except ocr.OCRError as exc:
+        raise HTTPException(502, str(exc))
+    return {"text": text[: max_input_chars()]}
 
 
 @app.post("/api/convert", dependencies=[Depends(require_password)])

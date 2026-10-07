@@ -5,7 +5,7 @@ import httpx
 from .config import env
 
 TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
-VOICE_LANGS = {"de": "de-DE", "fr": "fr-FR"}  # Kinyarwanda wird nicht vorgelesen
+VOICE_LANGS = {"de": "de-DE", "fr": "fr-FR", "en": "en-US"}  # Kinyarwanda wird nicht vorgelesen
 
 
 class TTSError(Exception):
