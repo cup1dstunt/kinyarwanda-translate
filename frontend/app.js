@@ -50,6 +50,7 @@ async function init() {
     fill($("provider"), info.providers);
     if (info.default) $("provider").value = info.default;
     showTab("translate");
+    updateSpeakState();
   } catch (e) { setStatus(e.message); }
 }
 
@@ -69,6 +70,8 @@ $("go").onclick = async () => {
       target: $("target").value, provider: $("provider").value || null,
     });
     $("output").value = r.translation;
+    addHistory({ source: $("source").value, target: $("target").value, input: $("input").value, output: r.translation });
+    updateSpeakState();
     setStatus("");
   } catch (e) { setStatus(e.message); }
 };
@@ -91,5 +94,91 @@ $("cur-go").onclick = async () => {
     $("cur-result").textContent = `${fmt.format(r.amount)} ${r.from} = ${fmt.format(r.result)} ${r.to}`;
   } catch (e) { setStatus(e.message); }
 };
+
+// --- Sprachausgabe (nur de/fr, Kinyarwanda bleibt Text) ---
+const SPEECH_LANGS = { de: "de", fr: "fr" };
+const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
+
+function voicesFor(lang) {
+  return synth ? synth.getVoices().filter((v) => v.lang.toLowerCase().startsWith(lang)) : [];
+}
+
+function updateSpeakState() {
+  const lang = SPEECH_LANGS[$("target").value];
+  const voices = lang ? voicesFor(lang) : [];
+  $("speak").disabled = !synth || !lang || !$("output").value;
+  $("voice").hidden = voices.length < 2;
+  if (voices.length >= 2) {
+    const saved = store.get("voice:" + lang);
+    fill($("voice"), voices.map((v) => v.name));
+    if (voices.some((v) => v.name === saved)) $("voice").value = saved;
+  }
+}
+
+$("speak").onclick = () => {
+  const lang = SPEECH_LANGS[$("target").value];
+  if (!synth || !lang) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance($("output").value);
+  u.lang = lang;
+  const voices = voicesFor(lang);
+  u.voice = voices.find((v) => v.name === $("voice").value) || voices[0] || null;
+  synth.speak(u);
+};
+
+$("voice").onchange = () => store.set("voice:" + SPEECH_LANGS[$("target").value], $("voice").value);
+$("target").onchange = updateSpeakState;
+if (synth) synth.onvoiceschanged = updateSpeakState;
+
+// --- Tauschen ---
+$("swap").onclick = () => {
+  const s = $("source").value;
+  $("source").value = $("target").value;
+  $("target").value = s;
+  const text = $("input").value;
+  $("input").value = $("output").value;
+  $("output").value = text;
+  updateSpeakState();
+};
+
+// --- Verlauf (nur lokal im Gerät) ---
+const HISTORY_MAX = 20;
+
+function loadHistory() {
+  try { return JSON.parse(store.get("history") || "[]"); } catch { return []; }
+}
+
+function addHistory(entry) {
+  const list = [entry, ...loadHistory().filter((h) => !(h.input === entry.input && h.source === entry.source && h.target === entry.target))];
+  store.set("history", JSON.stringify(list.slice(0, HISTORY_MAX)));
+  renderHistory();
+}
+
+function renderHistory() {
+  const items = loadHistory().map((h) => {
+    const li = document.createElement("li");
+    const head = document.createElement("small");
+    head.textContent = `${LANG_LABELS[h.source]} → ${LANG_LABELS[h.target]}`;
+    const body = document.createElement("span");
+    body.textContent = `${h.input} → ${h.output}`;
+    li.append(head, body);
+    li.onclick = () => {
+      $("source").value = h.source; $("target").value = h.target;
+      $("input").value = h.input; $("output").value = h.output;
+      updateSpeakState();
+    };
+    return li;
+  });
+  $("history").replaceChildren(...items);
+}
+
+$("history-clear").onclick = () => { store.del("history"); renderHistory(); };
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+renderHistory();
+updateSpeakState();
 
 init();

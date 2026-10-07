@@ -79,3 +79,9 @@ def test_convert(web, monkeypatch):
     assert r.json()["result"] == 10.0
     r = web.post("/api/convert", headers=H, json={"amount": 1, "source": "EUR", "target": "USD"})
     assert r.status_code == 502
+
+
+def test_pwa_files_served(web):
+    assert web.get("/manifest.json").status_code == 200
+    assert web.get("/sw.js").status_code == 200
+    assert "Übersetzer" in web.get("/").text
