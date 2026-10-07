@@ -90,3 +90,23 @@ def test_pwa_files_served(web):
 def test_health_shows_version(web, monkeypatch):
     monkeypatch.setenv("APP_VERSION", "7-abc1234")
     assert web.get("/health").json() == {"status": "ok", "version": "7-abc1234"}
+
+
+def test_tts_synthesize():
+    import base64
+    from backend import tts
+
+    def check(req):
+        assert b"fr-FR" in req.content
+
+    audio = tts.synthesize("Bonjour", "fr", client_for({"audioContent": base64.b64encode(b"ID3mp3").decode()}, check))
+    assert audio == b"ID3mp3"
+
+
+def test_tts_endpoint(web, monkeypatch):
+    from backend import tts
+
+    monkeypatch.setattr(tts, "synthesize", lambda text, lang: b"ID3mp3")
+    r = web.post("/api/tts", headers=H, json={"text": "Bonjour", "lang": "fr"})
+    assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg" and r.content == b"ID3mp3"
+    assert web.get("/api/providers", headers=H).json()["tts"] is True
