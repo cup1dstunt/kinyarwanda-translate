@@ -110,3 +110,30 @@ def test_tts_endpoint(web, monkeypatch):
     r = web.post("/api/tts", headers=H, json={"text": "Bonjour", "lang": "fr"})
     assert r.status_code == 200 and r.headers["content-type"] == "audio/mpeg" and r.content == b"ID3mp3"
     assert web.get("/api/providers", headers=H).json()["tts"] is True
+
+
+def test_ocr_detect_text():
+    from backend import ocr
+
+    payload = {"responses": [{"fullTextAnnotation": {"text": "Murakaza neza\n"}}]}
+    assert ocr.detect_text("aGVsbG8=", client_for(payload)) == "Murakaza neza"
+
+
+def test_ocr_vision_error():
+    from backend import ocr
+
+    payload = {"responses": [{"error": {"message": "Bad image data."}}]}
+    with pytest.raises(ocr.OCRError, match="Bad image data"):
+        ocr.detect_text("xx", client_for(payload))
+
+
+def test_ocr_endpoint(web, monkeypatch):
+    from backend import ocr
+
+    monkeypatch.setattr(ocr, "detect_text", lambda image: "Welcome")
+    assert web.post("/api/ocr", headers=H, json={"image": "aGVsbG8="}).json() == {"text": "Welcome"}
+    assert web.post("/api/ocr", headers=H, json={"image": ""}).status_code == 413
+
+
+def test_english_supported(web):
+    assert "en" in web.get("/api/providers", headers=H).json()["languages"]

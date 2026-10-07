@@ -1,4 +1,4 @@
-# Übersetzer-PWA (Deutsch / Französisch / Kinyarwanda)
+# Übersetzer-PWA (Deutsch / Französisch / Englisch / Kinyarwanda)
 
 Persönliche Übersetzungs-App als PWA für das iPhone. Läuft als Docker-Container auf einem Unraid-Server (Intel i5-11400, **keine NVIDIA-GPU**), erreichbar über Reverse Proxy mit HTTPS.
 
@@ -13,9 +13,10 @@ Die vollständige Spezifikation steht in `docs/SPEC.md`. Bei Widersprüchen gilt
 - API-Keys nur als Umgebungsvariablen im Backend, **nie** im Frontend oder im Repository (`.env` ist in `.gitignore`).
 - Jeder Übersetzungsanbieter bekommt ein eigenes Modul in `backend/providers/` mit derselben Schnittstelle: `translate(text, source, target) -> str`.
 - Im Frontend erscheinen nur Anbieter, für die ein Key gesetzt ist (Endpunkt `GET /api/providers`).
-- Sprachcodes: `de`, `fr`, `rw` (Kinyarwanda).
+- Sprachcodes: `de`, `fr`, `en`, `rw` (Kinyarwanda).
 - Modellnamen kommen aus Umgebungsvariablen (siehe `.env.example`); vor dem Einsetzen die aktuellen Modellnamen in der Anbieter-Dokumentation prüfen.
-- Sprachausgabe: nur Deutsch und Französisch über `speechSynthesis` im Browser. Kinyarwanda wird nur als Text angezeigt.
+- Sprachausgabe: Deutsch, Französisch und Englisch über Google Cloud Text-to-Speech (`POST /api/tts`), weil `speechSynthesis` in der installierten iOS-PWA stumm bleibt; Browser-Sprachausgabe nur als Rückfall ohne Google-Key. Kinyarwanda wird nur als Text angezeigt.
+- Texterkennung (Fotos von Schildern): Google Cloud Vision über `POST /api/ocr`.
 - Spracheingabe: iOS-Diktat der Tastatur in ein normales Textfeld. Die Web Speech API funktioniert in installierten iOS-PWAs laut WebKit-Bugtracker nicht zuverlässig; nur nutzen, wenn ein Test auf dem Gerät klappt.
 - Zugriffsschutz: einfacher Passwortschutz im Backend (`APP_PASSWORD`), zusätzlich zum Reverse Proxy.
 - Texte klein halten: Eingabe auf 2000 Zeichen begrenzen, damit keine hohen API-Kosten entstehen.

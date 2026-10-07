@@ -18,6 +18,7 @@
   <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 7h11m0 0-3-3m3 3-3 3M17 17H6m0 0 3-3m-3 3 3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Zm12.5-.5a4.5 4.5 0 0 1 0 6m2.5-8.5a8 8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.8l1.4-2h4.6l1.4 2h1.8A2.5 2.5 0 0 1 20 8.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 16.5v-8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.5" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
   <symbol id="i-clear" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-translate" viewBox="0 0 24 24"><path d="M4 5h9M8.5 3v2m2.5 0c0 4-3 7.5-6.5 9M6 9c1 2.5 3 4.5 5.5 5.5M13 21l4-10 4 10m-1.4-3.5h-5.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-coins" viewBox="0 0 24 24"><circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14.5 7.2A5.5 5.5 0 1 1 8 17.7M9 7v4m-1.5-1.5h2.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
@@ -49,6 +50,7 @@
           <div class="pane-actions">
             <small id="count">0 / 2000</small>
             <span class="spacer"></span>
+            <label id="ocr-btn" class="icon" title="Text aus Foto" aria-label="Text aus Foto erkennen" hidden><svg><use href="#i-camera"/></svg><input id="ocr-file" type="file" accept="image/*" hidden></label>
             <button id="clear" class="icon" title="Löschen" aria-label="Löschen"><svg><use href="#i-clear"/></svg></button>
             <button id="speak-in" class="icon" title="Vorlesen" aria-label="Eingabe vorlesen"><svg><use href="#i-speaker"/></svg></button>
           </div>
@@ -78,9 +80,9 @@
       <div class="card cur">
         <input id="amount" type="number" inputmode="decimal" min="0" step="any" placeholder="Betrag" aria-label="Betrag">
         <div class="langbar">
-          <select id="cur-from" aria-label="Von"><option>EUR</option><option>RWF</option></select>
+          <select id="cur-from" aria-label="Von"><option>RWF</option><option>EUR</option></select>
           <button id="cur-swap" class="icon round" title="Tauschen" aria-label="Währungen tauschen"><svg><use href="#i-swap"/></svg></button>
-          <select id="cur-to" aria-label="Nach"><option>RWF</option><option>EUR</option></select>
+          <select id="cur-to" aria-label="Nach"><option>EUR</option><option>RWF</option></select>
         </div>
         <button id="cur-go" class="primary big">Umrechnen</button>
         <p id="cur-result" aria-live="polite"></p>

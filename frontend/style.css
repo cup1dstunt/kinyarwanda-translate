@@ -86,10 +86,10 @@ button.primary {
 button.primary.big { min-height: 54px; font-size: 1.05rem; }
 button.primary:active { filter: brightness(.92); }
 button.ghost { color: var(--muted); padding: 10px 4px; }
-button.icon {
+button.icon, label.icon { cursor: pointer;
   width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; color: var(--muted);
 }
-button.icon:active { background: var(--chip); }
+button.icon:active, label.icon:active { background: var(--chip); }
 button.icon.round { background: var(--chip); border-radius: 50%; color: var(--accent); flex: 0 0 auto; }
 button:disabled { opacity: .35; cursor: default; }
 

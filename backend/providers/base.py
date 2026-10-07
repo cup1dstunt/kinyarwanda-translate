@@ -1,6 +1,6 @@
 import httpx
 
-LANG_NAMES = {"de": "German", "fr": "French", "rw": "Kinyarwanda"}
+LANG_NAMES = {"de": "German", "fr": "French", "en": "English", "rw": "Kinyarwanda"}
 LANGUAGES = list(LANG_NAMES)
 
 SYSTEM_PROMPT = (
