@@ -10,3 +10,9 @@ textarea, input, select, button { font-size: 16px; padding: 10px; border-radius:
 button { cursor: pointer; }
 #cur-result { font-size: 1.4rem; font-weight: 600; margin: 0; }
 #status { color: #c33; min-height: 1.2em; margin: 0; }
+#swap { flex: 0 0 auto; }
+#history { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+#history li { padding: 8px; border: 1px solid #8885; border-radius: 8px; cursor: pointer; }
+#history small { display: block; opacity: .7; }
+button:disabled { opacity: .4; }
+[hidden] { display: none !important; }
