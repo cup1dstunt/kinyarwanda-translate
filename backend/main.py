@@ -33,7 +33,7 @@ class ConvertRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": env("APP_VERSION", "dev")}
 
 
 @app.get("/api/providers", dependencies=[Depends(require_password)])
