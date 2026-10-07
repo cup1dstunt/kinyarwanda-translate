@@ -16,3 +16,4 @@ button { cursor: pointer; }
 #history small { display: block; opacity: .7; }
 button:disabled { opacity: .4; }
 [hidden] { display: none !important; }
+footer { text-align: center; opacity: .6; padding: 8px 0 env(safe-area-inset-bottom); }

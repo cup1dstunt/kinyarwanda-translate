@@ -85,3 +85,8 @@ def test_pwa_files_served(web):
     assert web.get("/manifest.json").status_code == 200
     assert web.get("/sw.js").status_code == 200
     assert "Übersetzer" in web.get("/").text
+
+
+def test_health_shows_version(web, monkeypatch):
+    monkeypatch.setenv("APP_VERSION", "7-abc1234")
+    assert web.get("/health").json() == {"status": "ok", "version": "7-abc1234"}

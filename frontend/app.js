@@ -181,4 +181,6 @@ if ("serviceWorker" in navigator) {
 renderHistory();
 updateSpeakState();
 
+fetch("/health").then((r) => r.json()).then((h) => { $("version").textContent = "Version " + h.version; }).catch(() => {});
+
 init();
