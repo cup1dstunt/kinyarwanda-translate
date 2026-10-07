@@ -113,11 +113,11 @@ function updateControls() {
   $("speak").disabled = !synth || !SPEECH_TAGS[tgt] || !$("output").value.trim();
   $("go").disabled = !$("input").value.trim();
   const voices = SPEECH_TAGS[tgt] ? voicesFor(tgt) : [];
-  $("voice").hidden = voices.length < 2;
-  if (voices.length >= 2) {
-    fill($("voice"), voices.map((v) => v.name));
+  $("voice").hidden = voices.length < 1;
+  if (voices.length) {
+    fill($("voice"), ["", ...voices.map((v) => v.name)], (n) => n || "Standardstimme");
     const saved = store.get("voice:" + tgt);
-    if (voices.some((v) => v.name === saved)) $("voice").value = saved;
+    $("voice").value = voices.some((v) => v.name === saved) ? saved : "";
   }
 }
 
@@ -126,16 +126,27 @@ function speak(text, code, voiceName) {
   setStatus("");
   if (synth.speaking || synth.pending) synth.cancel();
   synth.resume(); // iOS bleibt nach längerer Pause manchmal hängen
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = SPEECH_TAGS[code];
-  const voices = voicesFor(code);
-  const voice = voices.find((v) => v.name === voiceName) || voices.find((v) => v.default) || voices[0];
-  if (voice) u.voice = voice;
-  else if (synth.getVoices().length) {
-    setStatus("Keine Stimme für diese Sprache. iPhone: Einstellungen → Bedienungshilfen → Gesprochene Inhalte → Stimmen.");
-  }
-  u.onerror = (e) => { if (e.error !== "canceled" && e.error !== "interrupted") setStatus("Sprachausgabe fehlgeschlagen (" + e.error + "). Stummschalter und Lautstärke prüfen."); };
-  synth.speak(u);
+  const voice = voicesFor(code).find((v) => v.name === voiceName);
+
+  // Ohne gewählte Stimme nimmt iOS die Standardstimme der Sprache. Erweiterte/Premium-Stimmen
+  // bleiben in Safari manchmal stumm; startet nichts, gibt es einen Ersatzversuch ohne Stimme.
+  const attempt = (useVoice) => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = SPEECH_TAGS[code];
+    if (useVoice && voice) u.voice = voice;
+    let started = false;
+    u.onstart = () => { started = true; setStatus(""); };
+    u.onerror = (e) => {
+      if (e.error !== "canceled" && e.error !== "interrupted") setStatus("Sprachausgabe fehlgeschlagen (" + e.error + ").");
+    };
+    synth.speak(u);
+    setTimeout(() => {
+      if (started) return;
+      if (useVoice && voice) { synth.cancel(); attempt(false); return; }
+      setStatus("Die Sprachausgabe startet nicht. Stummschalter und Lautstärke prüfen, ggf. eine andere Stimme wählen.");
+    }, 1500);
+  };
+  attempt(true);
 }
 
 $("speak").onclick = () => speak($("output").value, $("target").value, $("voice").value);
