@@ -1,7 +1,12 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const LANG_LABELS = { de: "Deutsch", fr: "Français", rw: "Kinyarwanda" };
-let password = sessionStorage.getItem("pw") || "";
+const store = {
+  get: (k) => { try { return localStorage.getItem(k) || ""; } catch { return ""; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* ohne Speicher: Anmeldung pro Start */ } },
+  del: (k) => { try { localStorage.removeItem(k); } catch { /* ignorieren */ } },
+};
+let password = store.get("pw");
 
 function setStatus(msg) { $("status").textContent = msg || ""; }
 
@@ -11,7 +16,7 @@ async function api(path, body) {
     headers: { "Content-Type": "application/json", "X-App-Password": password },
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (res.status === 401) { showLogin(); throw new Error("Bitte anmelden"); }
+  if (res.status === 401) { store.del("pw"); showLogin(); throw new Error("Bitte anmelden"); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || "Fehler " + res.status);
   return data;
@@ -50,7 +55,7 @@ async function init() {
 
 $("login-btn").onclick = () => {
   password = $("password").value;
-  sessionStorage.setItem("pw", password);
+  store.set("pw", password);
   init();
 };
 $("tab-translate").onclick = () => showTab("translate");
