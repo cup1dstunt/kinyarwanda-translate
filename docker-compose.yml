@@ -1,6 +1,7 @@
 services:
   translator:
-    build: .
+    image: ghcr.io/cup1dstunt/kinyarwanda-translate:latest
+    pull_policy: always
     container_name: uebersetzer-pwa
     env_file: .env
     ports:

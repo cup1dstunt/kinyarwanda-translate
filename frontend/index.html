@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Übersetzer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <nav>
+    <button id="tab-translate" class="active">Übersetzen</button>
+    <button id="tab-currency">Währung</button>
+  </nav>
+
+  <section id="login" hidden>
+    <input id="password" type="password" placeholder="Passwort" autocomplete="current-password">
+    <button id="login-btn">Anmelden</button>
+  </section>
+
+  <section id="translate">
+    <div class="row">
+      <select id="source"></select>
+      <select id="target"></select>
+      <select id="provider"></select>
+    </div>
+    <textarea id="input" rows="5" placeholder="Text eingeben oder per Diktat sprechen" maxlength="2000"></textarea>
+    <button id="go">Übersetzen</button>
+    <textarea id="output" rows="5" readonly></textarea>
+    <button id="copy">Kopieren</button>
+  </section>
+
+  <section id="currency" hidden>
+    <div class="row">
+      <input id="amount" type="number" inputmode="decimal" min="0" step="any" placeholder="Betrag">
+      <select id="cur-from"><option>EUR</option><option>RWF</option></select>
+      <button id="cur-swap">⇄</button>
+      <select id="cur-to"><option>RWF</option><option>EUR</option></select>
+    </div>
+    <button id="cur-go">Umrechnen</button>
+    <p id="cur-result"></p>
+    <small>Richtwert (Tageskurs). Wechselstuben in Ruanda weichen oft ab.</small>
+  </section>
+
+  <p id="status" role="status"></p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

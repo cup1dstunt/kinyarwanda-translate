@@ -1,0 +1,5 @@
+# Lokale Entwicklung: baut das Image selbst statt es von ghcr.io zu ziehen.
+# Start: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  translator:
+    build: .
