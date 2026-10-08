@@ -32,17 +32,21 @@ function fill(select, values, label = (v) => v) {
   }));
 }
 
+const TABS = { translate: "translate", chat: "chat", favs: "favs", currency: "currency" };
+
 function showLogin() {
-  $("login").hidden = false; $("translate").hidden = true; $("currency").hidden = true; $("tabbar").hidden = true;
+  $("login").hidden = false; $("tabbar").hidden = true;
+  for (const v of Object.values(TABS)) $(v).hidden = true;
 }
 
 function showTab(name) {
   $("login").hidden = true;
   $("tabbar").hidden = false;
-  $("translate").hidden = name !== "translate";
-  $("currency").hidden = name !== "currency";
-  $("tab-translate").classList.toggle("active", name === "translate");
-  $("tab-currency").classList.toggle("active", name === "currency");
+  for (const [tab, view] of Object.entries(TABS)) {
+    $(view).hidden = tab !== name;
+    $("tab-" + tab).classList.toggle("active", tab === name);
+  }
+  if (name === "favs") renderFavs();
   setStatus("");
 }
 
@@ -58,6 +62,11 @@ async function init() {
     $("provider").hidden = info.providers.length < 2;
     serverTts = !!info.tts;
     $("ocr-btn").hidden = !info.ocr;
+    $("price-btn").hidden = !info.ocr;
+    fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
+    fill($("conv-b"), info.languages, (l) => LANG_LABELS[l]);
+    $("conv-a").value = "de"; $("conv-b").value = "rw";
+    updateWho();
     showTab("translate");
     updateControls();
   } catch (e) { setStatus(e.message); }
@@ -71,6 +80,8 @@ $("login-btn").onclick = () => {
 $("password").onkeydown = (e) => { if (e.key === "Enter") $("login-btn").click(); };
 $("tab-translate").onclick = () => showTab("translate");
 $("tab-currency").onclick = () => showTab("currency");
+$("tab-chat").onclick = () => showTab("chat");
+$("tab-favs").onclick = () => showTab("favs");
 
 async function translate() {
   if (!$("input").value.trim()) return;
@@ -116,6 +127,8 @@ function updateControls() {
   $("speak-in").disabled = !canSpeak || !SPEECH_TAGS[src] || !$("input").value.trim();
   $("speak").disabled = !canSpeak || !SPEECH_TAGS[tgt] || !$("output").value.trim();
   $("go").disabled = !$("input").value.trim();
+  for (const id of ["fav", "show", "rate-up", "rate-down"]) $(id).disabled = !$("output").value.trim();
+  $("rate-box").hidden = true;
   const voices = SPEECH_TAGS[tgt] && !serverTts ? voicesFor(tgt) : [];
   $("voice").hidden = voices.length < 1;
   if (voices.length) {
@@ -293,6 +306,219 @@ $("cur-go").onclick = async () => {
     });
     const fmt = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
     $("cur-result").textContent = `${fmt.format(r.amount)} ${r.from} = ${fmt.format(r.result)} ${r.to}`;
+  } catch (e) { setStatus(e.message); }
+};
+
+// --- Großanzeige („Zeigen“) ---
+function zoom(text) {
+  $("zoom-text").textContent = text;
+  $("zoom").hidden = false;
+}
+$("zoom").onclick = () => { $("zoom").hidden = true; };
+$("show").onclick = () => zoom($("output").value);
+
+// --- Favoriten / Phrasebook (lokal, auch offline nutzbar) ---
+const CATEGORIES = ["Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"];
+
+function loadJson(key) {
+  try { return JSON.parse(store.get(key) || "[]"); } catch { return []; }
+}
+
+function favId(f) { return [f.source, f.target, f.input].join("|"); }
+
+function addFav(cat) {
+  const fav = { cat, source: $("source").value, target: $("target").value, input: $("input").value, output: $("output").value };
+  const list = loadJson("favs").filter((f) => favId(f) !== favId(fav));
+  store.set("favs", JSON.stringify([fav, ...list]));
+}
+
+$("fav").onclick = () => {
+  const cat = window.prompt("Kategorie: " + CATEGORIES.join(", "), store.get("last-cat") || CATEGORIES[0]);
+  if (cat === null) return;
+  const match = CATEGORIES.find((c) => c.toLowerCase() === cat.trim().toLowerCase());
+  const chosen = match || cat.trim() || "Sonstiges";
+  store.set("last-cat", chosen);
+  addFav(chosen);
+  setStatus("");
+  $("fav").classList.add("on");
+  setTimeout(() => $("fav").classList.remove("on"), 1500);
+};
+
+function renderFavs() {
+  const all = loadJson("favs");
+  const cats = [...new Set([...CATEGORIES, ...all.map((f) => f.cat)])];
+  const current = $("fav-filter").value || "";
+  fill($("fav-filter"), ["", ...cats], (c) => c || "Alle Kategorien");
+  $("fav-filter").value = cats.includes(current) ? current : "";
+  const shown = all.filter((f) => !$("fav-filter").value || f.cat === $("fav-filter").value);
+  $("fav-empty").hidden = shown.length > 0;
+  $("fav-list").replaceChildren(...shown.map((f) => {
+    const card = document.createElement("div");
+    card.className = "card fav";
+    const meta = document.createElement("small");
+    meta.textContent = `${f.cat} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
+    const inp = document.createElement("div");
+    inp.textContent = f.input;
+    const out = document.createElement("strong");
+    out.textContent = f.output;
+    const row = document.createElement("div");
+    row.className = "fav-actions";
+    row.append(
+      mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
+      mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
+      mkBtn("#i-trash", "Löschen", () => {
+        store.set("favs", JSON.stringify(loadJson("favs").filter((x) => favId(x) !== favId(f))));
+        renderFavs();
+      }),
+    );
+    card.append(meta, inp, out, row);
+    return card;
+  }));
+  $("rate-count").textContent = loadJson("ratings").length;
+}
+$("fav-filter").onchange = renderFavs;
+
+function mkBtn(icon, label, onclick, disabled = false) {
+  const b = document.createElement("button");
+  b.className = "icon"; b.title = label; b.setAttribute("aria-label", label);
+  b.innerHTML = `<svg><use href="${icon}"/></svg>`;
+  b.onclick = onclick; b.disabled = disabled;
+  return b;
+}
+
+// --- Bewertung durch Muttersprachler (für den Qualitätstest) ---
+
+function saveRating(good, correction) {
+  const list = loadJson("ratings");
+  list.push({
+    time: new Date().toISOString(), provider: $("provider").value || "", source: $("source").value, target: $("target").value,
+    input: $("input").value, output: $("output").value, good, correction,
+  });
+  store.set("ratings", JSON.stringify(list));
+}
+
+$("rate-up").onclick = () => { saveRating(true, ""); $("rate-box").hidden = true; setStatus(""); };
+$("rate-down").onclick = () => {
+  $("rate-fix").value = "";
+  $("rate-box").hidden = false;
+  $("rate-fix").focus();
+};
+$("rate-save").onclick = () => {
+  saveRating(false, $("rate-fix").value.trim());
+  $("rate-box").hidden = true;
+};
+
+function ratingsMarkdown() {
+  const esc = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
+  const rows = loadJson("ratings").map((r) =>
+    `| ${r.time.slice(0, 10)} | ${r.provider} | ${r.source}→${r.target} | ${esc(r.input)} | ${esc(r.output)} | ${r.good ? "👍" : "👎"} | ${esc(r.correction)} |`);
+  return ["| Datum | Anbieter | Richtung | Eingabe | Übersetzung | Urteil | Korrektur |", "|---|---|---|---|---|---|---|", ...rows].join("\n");
+}
+
+$("rate-export").onclick = async () => {
+  const text = ratingsMarkdown();
+  try {
+    if (navigator.share) await navigator.share({ text });
+    else { await navigator.clipboard.writeText(text); setStatus("In die Zwischenablage kopiert."); }
+  } catch (e) {
+    if (e.name !== "AbortError") setStatus("Export nicht möglich: " + e.message);
+  }
+};
+$("rate-clear").onclick = () => {
+  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); renderFavs(); }
+};
+
+// --- Gesprächsmodus: zwei Sprachen, abwechselnd ---
+let who = "a";
+
+function updateWho() {
+  $("who-a").textContent = LANG_LABELS[$("conv-a").value] || "";
+  $("who-b").textContent = LANG_LABELS[$("conv-b").value] || "";
+  $("who-a").classList.toggle("active", who === "a");
+  $("who-b").classList.toggle("active", who === "b");
+}
+$("who-a").onclick = () => { who = "a"; updateWho(); };
+$("who-b").onclick = () => { who = "b"; updateWho(); };
+$("conv-a").onchange = $("conv-b").onchange = updateWho;
+$("conv-swap").onclick = () => {
+  const a = $("conv-a").value;
+  $("conv-a").value = $("conv-b").value;
+  $("conv-b").value = a;
+  updateWho();
+};
+
+$("chat-go").onclick = async () => {
+  const text = $("chat-text").value.trim();
+  if (!text) return;
+  const from = $(who === "a" ? "conv-a" : "conv-b").value;
+  const to = $(who === "a" ? "conv-b" : "conv-a").value;
+  $("chat-go").disabled = true;
+  setStatus("Übersetze …");
+  try {
+    const r = await api("/api/translate", { text, source: from, target: to, provider: $("provider").value || null });
+    addBubble(from, to, text, r.translation, who);
+    $("chat-text").value = "";
+    who = who === "a" ? "b" : "a"; // nächster Sprecher
+    updateWho();
+    setStatus("");
+  } catch (e) { setStatus(e.message); }
+  $("chat-go").disabled = false;
+};
+
+function addBubble(from, to, text, translation, side) {
+  const div = document.createElement("div");
+  div.className = "bubble " + side;
+  const orig = document.createElement("small");
+  orig.textContent = `${LANG_LABELS[from]}: ${text}`;
+  const big = document.createElement("div");
+  big.className = "big-text";
+  big.textContent = translation;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  row.append(
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(translation, to, ""), !(serverTts || synth) || !SPEECH_TAGS[to]),
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(translation)),
+  );
+  div.append(orig, big, row);
+  $("chat-log").append(div);
+  div.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+$("chat-clear").onclick = () => $("chat-log").replaceChildren();
+
+// --- Preisschild: Foto → Beträge → Euro ---
+function parsePrices(text) {
+  const out = [];
+  for (const line of text.split(/\n/)) {
+    for (const m of line.matchAll(/\d{1,3}(?:[.,\s]\d{3})+(?!\d)|\d+/g)) {
+      const amount = parseInt(m[0].replace(/[.,\s]/g, ""), 10);
+      if (amount >= 50) out.push({ line: line.trim(), amount }); // kleine Zahlen sind meist Mengen/Hausnummern
+    }
+  }
+  return out.slice(0, 30);
+}
+
+$("price-file").onchange = async () => {
+  const file = $("price-file").files[0];
+  $("price-file").value = "";
+  if (!file) return;
+  setStatus("Erkenne Preise …");
+  try {
+    const r = await api("/api/ocr", { image: await imageToBase64(file) });
+    const prices = parsePrices(r.text || "");
+    if (!prices.length) { setStatus("Keine Preise im Bild gefunden."); return; }
+    const probe = await api("/api/convert", { amount: 1000, source: "RWF", target: "EUR" });
+    const rate = probe.result / 1000;
+    const fmt = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+    $("price-list").replaceChildren(...prices.map((p) => {
+      const li = document.createElement("li");
+      const l = document.createElement("small");
+      l.textContent = p.line;
+      const v = document.createElement("strong");
+      v.textContent = `${fmt.format(p.amount)} RWF = ${fmt.format(p.amount * rate)} €`;
+      li.append(v, l);
+      return li;
+    }));
+    setStatus("");
   } catch (e) { setStatus(e.message); }
 };
 

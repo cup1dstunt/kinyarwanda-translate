@@ -150,3 +150,35 @@ footer { text-align: center; }
   textarea { min-height: 90px; }
   .panes { grid-template-columns: 1fr 1fr; }
 }
+
+/* Favoriten, Bewertung, Gespräch, Preisschild, Großanzeige */
+.pane-actions .icon.on { color: #e0a800; }
+.rate { display: flex; gap: 8px; padding: 10px; align-items: center; }
+.rate input { flex: 1; min-width: 0; min-height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.empty { color: var(--muted); text-align: center; }
+.fav-list { display: grid; gap: 12px; }
+.fav { padding: 14px 16px 6px; display: grid; gap: 4px; line-height: 1.4; }
+.fav strong { font-size: 1.15rem; }
+.fav-actions { display: flex; gap: 2px; margin-left: -8px; }
+.chat-log { display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
+.bubble { max-width: 88%; padding: 12px 14px 4px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.bubble.a { align-self: flex-start; }
+.bubble.b { align-self: flex-end; background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.big-text { font-size: 1.3rem; font-weight: 650; line-height: 1.3; margin-top: 4px; }
+.chat-input { display: grid; gap: 4px; padding: 10px 0 0; }
+.chat-input textarea { min-height: 80px; }
+.seg { display: flex; gap: 6px; padding: 0 12px; }
+.seg button { flex: 1; min-height: 40px; border-radius: 12px; background: var(--chip); font-weight: 600; color: var(--muted); }
+.seg button.active { background: var(--accent); color: var(--accent-text); }
+.ocr-prices { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 14px; cursor: pointer; background: var(--chip); color: var(--accent); font-weight: 650; }
+.ocr-prices svg { width: 22px; height: 22px; }
+.price-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.price-list li { background: var(--chip); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; }
+.price-list strong { font-size: 1.25rem; }
+.zoom {
+  position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 16px; text-align: center;
+  padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+}
+.zoom p { margin: 0; font-size: clamp(2rem, 9vw, 5rem); font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; }
+@media (max-width: 420px) { .tabbar button span { font-size: 11px; } }
