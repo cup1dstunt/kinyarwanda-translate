@@ -43,3 +43,17 @@ Variante B: ohne offene Ports per **Cloudflare Tunnel** oder **Tailscale** (mit 
 
 ## 5. Auf dem iPhone
 In Safari die HTTPS-Adresse öffnen, Passwort eingeben, dann Teilen → „Zum Home-Bildschirm“. Manifest und Service Worker folgen in Stufe 2.
+
+
+## Zugangscodes und Cache (persistente Daten)
+
+Die App speichert Zugangscodes (`users.json`) und den Übersetzungs-Cache (`cache.db`) in `/data` im Container. Damit sie ein Update überleben, muss `/data` auf den Server gemappt sein. In der Compose-Datei (Compose Manager) beim Dienst ergänzen:
+
+```yaml
+    volumes:
+      - /mnt/user/appdata/uebersetzer-pwa/data:/data
+```
+
+Ohne dieses Volume gehen Codes und Cache bei jedem Update verloren.
+
+Zugänge anlegen: mit dem Hauptpasswort anmelden, Tab „Favoriten“, „Zugänge verwalten“. Jede Person bekommt einen eigenen Code, den sie statt des Passworts eingibt. Sperren löscht den Code sofort.

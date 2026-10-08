@@ -6,4 +6,6 @@ services:
     env_file: .env
     ports:
       - "8085:8000"
+    volumes:
+      - ./data:/data
     restart: unless-stopped

@@ -39,7 +39,7 @@
   <main>
     <section id="login" class="card login" hidden>
       <h2>Anmelden</h2>
-      <input id="password" type="password" placeholder="Passwort" autocomplete="current-password">
+      <input id="password" type="password" placeholder="Passwort oder Zugangscode" autocomplete="current-password">
       <button id="login-btn" class="primary">Anmelden</button>
     </section>
 
@@ -132,6 +132,15 @@
         <p><small>Rückmeldungen der Muttersprachlerin zur Übersetzungsqualität. Exportieren und in docs/TESTERGEBNISSE.md einfügen.</small></p>
         <button id="rate-export" class="primary">Exportieren</button>
         <button id="rate-clear" class="ghost">Bewertungen löschen</button>
+      </details>
+      <details id="admin" class="card" hidden>
+        <summary>Zugänge verwalten</summary>
+        <p><small>Jede Person bekommt einen eigenen Code statt deines Passworts. Einzeln sperrbar.</small></p>
+        <div class="rate">
+          <input id="admin-name" type="text" placeholder="Name, z. B. Anna" aria-label="Name">
+          <button id="admin-add" class="primary">Anlegen</button>
+        </div>
+        <ul id="admin-list" class="price-list"></ul>
       </details>
     </section>
 
