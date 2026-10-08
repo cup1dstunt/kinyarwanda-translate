@@ -148,3 +148,10 @@ def test_provider_error_shows_google_message():
     p = GoogleTranslate("k", client=httpx.Client(transport=httpx.MockTransport(handler)))
     with pytest.raises(ProviderError, match="HTTP 403: Requests to this API are blocked"):
         p.translate("Hallo", "de", "rw")
+
+
+def test_phrasebook_complete(web):
+    phrases = web.get("/phrases.json").json()
+    assert {p["c"] for p in phrases} >= {"Alltagssprache", "Arzt", "Behörde", "Einkaufen"}
+    for p in phrases:
+        assert all(p.get(k, "").strip() for k in ("de", "fr", "en", "rw")), p

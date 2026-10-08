@@ -182,3 +182,5 @@ footer { text-align: center; }
 }
 .zoom p { margin: 0; font-size: clamp(2rem, 9vw, 5rem); font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; }
 @media (max-width: 420px) { .tabbar button span { font-size: 11px; } }
+
+.hint { margin: 0; color: var(--muted); font-size: .9rem; }
