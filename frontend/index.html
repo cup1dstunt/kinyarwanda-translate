@@ -149,7 +149,7 @@
         <select id="ph-cat" aria-label="Kategorie"></select>
         <select id="ph-lang" aria-label="Sprache"></select>
       </div>
-      <p class="hint">Fertige Sätze, Deutsch → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.</p>
+      <p id="ph-hint" class="hint">Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.</p>
       <div id="ph-list" class="fav-list"></div>
     </div>
 
@@ -187,13 +187,17 @@
     </section>
 
     <section id="favs" class="view" hidden>
+      <div class="card cur settings">
+        <label for="ui-lang"><small>Sprache der App</small></label>
+        <select id="ui-lang"></select>
+      </div>
       <div class="langbar">
         <select id="fav-filter" aria-label="Kategorie"></select>
       </div>
       <div id="fav-list" class="fav-list"></div>
       <p id="fav-empty" class="empty">Noch keine Favoriten. Beim Übersetzen den Stern drücken.</p>
       <details class="card">
-        <summary>Bewertungen (<span id="rate-count">0</span>)</summary>
+        <summary><span>Bewertungen</span> (<span id="rate-count">0</span>)</summary>
         <p><small>Rückmeldungen der Muttersprachlerin zur Übersetzungsqualität. Exportieren und in docs/TESTERGEBNISSE.md einfügen.</small></p>
         <button id="rate-export" class="primary">Exportieren</button>
         <button id="rate-clear" class="ghost">Bewertungen löschen</button>
@@ -219,7 +223,7 @@
         </div>
         <button id="cur-go" class="primary big">Umrechnen</button>
         <p id="cur-result" aria-live="polite"></p>
-        <label class="primary ocr-prices" id="price-btn" hidden><svg><use href="#i-camera"/></svg> Preisschild fotografieren<input id="price-file" type="file" accept="image/*" hidden></label>
+        <label class="primary ocr-prices" id="price-btn" hidden><svg><use href="#i-camera"/></svg><span>Preisschild fotografieren</span><input id="price-file" type="file" accept="image/*" hidden></label>
         <ul id="price-list" class="price-list"></ul>
         <small>Richtwert (Tageskurs). Wechselstuben in Ruanda weichen oft ab.</small>
       </div>
@@ -233,11 +237,12 @@
     <button id="tab-translate" class="active"><svg><use href="#i-translate"/></svg><span>Übersetzen</span></button>
     <button id="tab-chat"><svg><use href="#i-chat"/></svg><span>Gespräch</span></button>
     <button id="tab-phrases"><svg><use href="#i-book"/></svg><span>Phrasen</span></button>
-    <button id="tab-favs"><svg><use href="#i-star"/></svg><span>Favoriten</span></button>
+    <button id="tab-favs"><svg><use href="#i-star"/></svg><span>Favoriten/Einstellungen</span></button>
     <button id="tab-currency"><svg><use href="#i-coins"/></svg><span>Währung</span></button>
   </nav>
 </div>
 <div id="zoom" class="zoom" hidden role="dialog" aria-label="Großanzeige"><p id="zoom-text"></p><small>Tippen zum Schließen</small></div>
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

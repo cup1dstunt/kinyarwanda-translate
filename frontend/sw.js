@@ -1,7 +1,7 @@
 "use strict";
 // Service Worker nur für die App-Hülle; API-Aufrufe gehen immer ans Netz.
-const CACHE = "shell-v8";
-const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/manifest.json", "/icon-192.png", "/phrases.json"];
+const CACHE = "shell-v9";
+const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/i18n.js", "/manifest.json", "/icon-192.png", "/phrases.json"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

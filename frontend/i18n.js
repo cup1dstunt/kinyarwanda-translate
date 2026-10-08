@@ -1,0 +1,204 @@
+"use strict";
+// Oberflächensprache: Schlüssel sind die deutschen Originaltexte, Werte die Übersetzungen.
+// Fehlt ein Eintrag, bleibt der deutsche Text stehen. Die Sprache gilt pro Gerät (localStorage "ui-lang").
+const UI_LANGS = ["de", "en", "fr", "rw"];
+const UI_NAMES = { de: "Deutsch", en: "English", fr: "Français", rw: "Kinyarwanda" };
+const I18N = {
+  "Anbieter": {"en": "Provider", "fr": "Fournisseur", "rw": "Utanga serivisi"},
+  "Anmelden": {"en": "Sign in", "fr": "Se connecter", "rw": "Injira"},
+  "Passwort oder Zugangscode": {"en": "Password or access code", "fr": "Mot de passe ou code d'accès", "rw": "Ijambo ry'ibanga cyangwa kode yo kwinjira"},
+  "Von": {"en": "From", "fr": "De", "rw": "Kuva"},
+  "Nach": {"en": "To", "fr": "Vers", "rw": "Ujya"},
+  "Sprachen tauschen": {"en": "Swap languages", "fr": "Inverser les langues", "rw": "Hinduranya indimi"},
+  "Text eingeben oder per Diktat sprechen": {"en": "Type text or dictate", "fr": "Saisissez du texte ou dictez", "rw": "Andika umwandiko cyangwa uwuvuge"},
+  "Text": {"en": "Text", "fr": "Texte", "rw": "Umwandiko"},
+  "Text aus Foto": {"en": "Text from photo", "fr": "Texte depuis une photo", "rw": "Umwandiko uri ku ifoto"},
+  "Text aus Foto erkennen": {"en": "Recognize text from a photo", "fr": "Reconnaître le texte d'une photo", "rw": "Soma umwandiko uri ku ifoto"},
+  "Löschen": {"en": "Delete", "fr": "Supprimer", "rw": "Siba"},
+  "Vorlesen": {"en": "Read aloud", "fr": "Lire à voix haute", "rw": "Soma mu ijwi"},
+  "Eingabe vorlesen": {"en": "Read input aloud", "fr": "Lire le texte saisi à voix haute", "rw": "Soma mu ijwi ibyanditswe"},
+  "Übersetzung": {"en": "Translation", "fr": "Traduction", "rw": "Ubuhinduzi"},
+  "Stimme": {"en": "Voice", "fr": "Voix", "rw": "Ijwi"},
+  "Gute Übersetzung": {"en": "Good translation", "fr": "Bonne traduction", "rw": "Ubuhinduzi bwiza"},
+  "Falsche Übersetzung": {"en": "Wrong translation", "fr": "Traduction incorrecte", "rw": "Ubuhinduzi butari bwo"},
+  "Als Favorit speichern": {"en": "Save as favorite", "fr": "Enregistrer en favori", "rw": "Bika nk'ikunzwe"},
+  "Groß anzeigen": {"en": "Show large", "fr": "Afficher en grand", "rw": "Erekana nini"},
+  "Kopieren": {"en": "Copy", "fr": "Copier", "rw": "Koporora"},
+  "Übersetzung vorlesen": {"en": "Read translation aloud", "fr": "Lire la traduction à voix haute", "rw": "Soma ubuhinduzi mu ijwi"},
+  "Bessere Übersetzung (optional, z. B. von Muttersprachlerin)": {"en": "Better translation (optional, e.g. from a native speaker)", "fr": "Meilleure traduction (facultatif, p. ex. d'un locuteur natif)", "rw": "Ubuhinduzi bwiza kurushaho (si ngombwa, urugero: bwa nyirurimi)"},
+  "Korrektur": {"en": "Correction", "fr": "Correction", "rw": "Gukosora"},
+  "Speichern": {"en": "Save", "fr": "Enregistrer", "rw": "Bika"},
+  "Übersetzen": {"en": "Translate", "fr": "Traduire", "rw": "Hindura"},
+  "Verlauf": {"en": "History", "fr": "Historique", "rw": "Amateka"},
+  "Verlauf löschen": {"en": "Clear history", "fr": "Effacer l'historique", "rw": "Siba amateka"},
+  "Modus": {"en": "Mode", "fr": "Mode", "rw": "Uburyo"},
+  "Ein Gerät": {"en": "One device", "fr": "Un appareil", "rw": "Telefoni imwe"},
+  "Zwei Handys": {"en": "Two phones", "fr": "Deux téléphones", "rw": "Telefoni ebyiri"},
+  "Ich spreche": {"en": "I speak", "fr": "Je parle", "rw": "Ndavuga"},
+  "Gegenüber spricht": {"en": "Other person speaks", "fr": "L'autre personne parle", "rw": "Undi muntu avuga"},
+  "Wer spricht": {"en": "Who is speaking", "fr": "Qui parle", "rw": "Ni nde uvuga"},
+  "Text eingeben oder diktieren": {"en": "Type or dictate text", "fr": "Saisissez ou dictez du texte", "rw": "Andika cyangwa uvuge"},
+  "Gesprächstext": {"en": "Conversation text", "fr": "Texte de la conversation", "rw": "Umwandiko w'ikiganiro"},
+  "Gespräch leeren": {"en": "Clear conversation", "fr": "Effacer la conversation", "rw": "Siba ikiganiro"},
+  "Senden": {"en": "Send", "fr": "Envoyer", "rw": "Ohereza"},
+  "Ich schreibe auf": {"en": "I write in", "fr": "J'écris en", "rw": "Nandika mu"},
+  "Neuen Raum erstellen": {"en": "Create new room", "fr": "Créer une nouvelle salle", "rw": "Fungura icyumba gishya"},
+  "Raum-Code eingeben": {"en": "Enter room code", "fr": "Saisir le code de la salle", "rw": "Andika kode y'icyumba"},
+  "Raum-Code": {"en": "Room code", "fr": "Code de la salle", "rw": "Kode y'icyumba"},
+  "Beitreten": {"en": "Join", "fr": "Rejoindre", "rw": "Injira mu cyumba"},
+  "Raum-Code (weitergeben)": {"en": "Room code (share it)", "fr": "Code de la salle (à partager)", "rw": "Kode y'icyumba (yihe abandi)"},
+  "Verlassen": {"en": "Leave", "fr": "Quitter", "rw": "Va mu cyumba"},
+  "Nachricht eingeben oder diktieren": {"en": "Type or dictate a message", "fr": "Saisissez ou dictez un message", "rw": "Andika cyangwa uvuge ubutumwa"},
+  "Nachricht": {"en": "Message", "fr": "Message", "rw": "Ubutumwa"},
+  "Bereich": {"en": "Section", "fr": "Section", "rw": "Igice"},
+  "Sätze": {"en": "Phrases", "fr": "Phrases", "rw": "Interuro"},
+  "Lernen": {"en": "Learn", "fr": "Apprendre", "rw": "Kwiga"},
+  "Kategorie": {"en": "Category", "fr": "Catégorie", "rw": "Icyiciro"},
+  "Sprache": {"en": "Language", "fr": "Langue", "rw": "Ururimi"},
+  "Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.": {"en": "Ready-made phrases, {0} → target language. Kinyarwanda is unverified until confirmed with 👍 or corrected with 👎.", "fr": "Phrases toutes faites, {0} → langue cible. Le kinyarwanda n'est pas vérifié tant qu'il n'est pas confirmé avec 👍 ou corrigé avec 👎.", "rw": "Interuro zateguwe, {0} → ururimi wahisemo. Ikinyarwanda ntikirasuzumwa kugeza kibyemejwe na 👍 cyangwa gikosowe na 👎."},
+  "Noch keine Listen. Lege unten die erste an.": {"en": "No lists yet. Create the first one below.", "fr": "Aucune liste pour l'instant. Créez la première ci-dessous.", "rw": "Nta rutonde ruraboneka. Kora urwa mbere hasi."},
+  "Neue Vokabelliste": {"en": "New vocabulary list", "fr": "Nouvelle liste de vocabulaire", "rw": "Urutonde rushya rw'amagambo"},
+  "Titel, z. B. Markt": {"en": "Title, e.g. Market", "fr": "Titre, p. ex. Marché", "rw": "Umutwe, urugero: Isoko"},
+  "Titel": {"en": "Title", "fr": "Titre", "rw": "Umutwe"},
+  "Eine Zeile pro Wort:\nWasser = amazi\nBrot\n(ohne „=“ wird automatisch übersetzt)": {"en": "One line per word:\nWasser = amazi\nBrot\n(without “=” it is translated automatically)", "fr": "Une ligne par mot :\nWasser = amazi\nBrot\n(sans « = », la traduction est automatique)", "rw": "Umurongo umwe ku ijambo:\nWasser = amazi\nBrot\n(udafite «=» ruhindurwa ubwaryo)"},
+  "Wörter": {"en": "Words", "fr": "Mots", "rw": "Amagambo"},
+  "Liste speichern": {"en": "Save list", "fr": "Enregistrer la liste", "rw": "Bika urutonde"},
+  "Beenden": {"en": "Finish", "fr": "Terminer", "rw": "Rangiza"},
+  "Antwort eintippen": {"en": "Type your answer", "fr": "Saisissez votre réponse", "rw": "Andika igisubizo"},
+  "Antwort": {"en": "Answer", "fr": "Réponse", "rw": "Igisubizo"},
+  "Prüfen": {"en": "Check", "fr": "Vérifier", "rw": "Genzura"},
+  "Weiter": {"en": "Next", "fr": "Suivant", "rw": "Komeza"},
+  "Noch keine Favoriten. Beim Übersetzen den Stern drücken.": {"en": "No favorites yet. Tap the star while translating.", "fr": "Pas encore de favoris. Appuyez sur l'étoile lors d'une traduction.", "rw": "Nta bikunzwe biraboneka. Kanda inyenyeri mu gihe uhindura."},
+  "Rückmeldungen der Muttersprachlerin zur Übersetzungsqualität. Exportieren und in docs/TESTERGEBNISSE.md einfügen.": {"en": "Native-speaker feedback on translation quality. Export and paste into docs/TESTERGEBNISSE.md.", "fr": "Retours de la locutrice native sur la qualité des traductions. Exporter et coller dans docs/TESTERGEBNISSE.md.", "rw": "Ibitekerezo bya nyirurimi ku bwiza bw'ubuhinduzi. Ubyohereze hanze hanyuma ubishyire muri docs/TESTERGEBNISSE.md."},
+  "Exportieren": {"en": "Export", "fr": "Exporter", "rw": "Ohereza hanze"},
+  "Bewertungen löschen": {"en": "Delete ratings", "fr": "Supprimer les évaluations", "rw": "Siba amasuzuma"},
+  "Bewertungen": {"en": "Ratings", "fr": "Évaluations", "rw": "Amasuzuma"},
+  "Zugänge verwalten": {"en": "Manage access", "fr": "Gérer les accès", "rw": "Gucunga uburenganzira bwo kwinjira"},
+  "Jede Person bekommt einen eigenen Code statt deines Passworts. Einzeln sperrbar.": {"en": "Each person gets their own code instead of your password. Can be blocked individually.", "fr": "Chaque personne reçoit son propre code au lieu de votre mot de passe. Blocage individuel possible.", "rw": "Buri muntu ahabwa kode ye aho gukoresha ijambo ryawe ry'ibanga. Buri imwe ishobora guhagarikwa."},
+  "Name, z. B. Anna": {"en": "Name, e.g. Anna", "fr": "Nom, p. ex. Anna", "rw": "Izina, urugero: Anna"},
+  "Name": {"en": "Name", "fr": "Nom", "rw": "Izina"},
+  "Anlegen": {"en": "Create", "fr": "Créer", "rw": "Kora"},
+  "Betrag": {"en": "Amount", "fr": "Montant", "rw": "Amafaranga"},
+  "Tauschen": {"en": "Swap", "fr": "Inverser", "rw": "Hinduranya"},
+  "Währungen tauschen": {"en": "Swap currencies", "fr": "Inverser les devises", "rw": "Hinduranya amafaranga"},
+  "Umrechnen": {"en": "Convert", "fr": "Convertir", "rw": "Hindura mu yandi mafaranga"},
+  "Richtwert (Tageskurs). Wechselstuben in Ruanda weichen oft ab.": {"en": "Rough guide (daily rate). Exchange offices in Rwanda often differ.", "fr": "Valeur indicative (cours du jour). Les bureaux de change au Rwanda diffèrent souvent.", "rw": "Igiciro cy'ubu (cy'umunsi). Aho bavunjira mu Rwanda akenshi haratandukanye."},
+  "Gespräch": {"en": "Conversation", "fr": "Conversation", "rw": "Ikiganiro"},
+  "Phrasen": {"en": "Phrases", "fr": "Phrases", "rw": "Interuro"},
+  "Favoriten": {"en": "Favorites", "fr": "Favoris", "rw": "Ibikunzwe"},
+  "Favoriten/Einstellungen": {"en": "Favorites/Settings", "fr": "Favoris/Réglages", "rw": "Ibikunzwe/Igenamiterere"},
+  "Währung": {"en": "Currency", "fr": "Devise", "rw": "Amafaranga"},
+  "Großanzeige": {"en": "Large display", "fr": "Affichage grand format", "rw": "Ibyerekanwe binini"},
+  "Tippen zum Schließen": {"en": "Tap to close", "fr": "Touchez pour fermer", "rw": "Kanda ufunge"},
+  "Preisschild fotografieren": {"en": "Photograph a price tag", "fr": "Photographier une étiquette de prix", "rw": "Fotora igiciro"},
+  "Sprache der App": {"en": "App language", "fr": "Langue de l'application", "rw": "Ururimi rwa porogaramu"},
+  "Einstellungen": {"en": "Settings", "fr": "Réglages", "rw": "Igenamiterere"},
+  "Bitte anmelden": {"en": "Please sign in", "fr": "Veuillez vous connecter", "rw": "Injira mbere"},
+  "Fehler {0}": {"en": "Error {0}", "fr": "Erreur {0}", "rw": "Ikosa {0}"},
+  "Übersetze …": {"en": "Translating …", "fr": "Traduction en cours …", "rw": "Ndahindura …"},
+  "Kopieren nicht möglich": {"en": "Copying not possible", "fr": "Copie impossible", "rw": "Gukoporora ntibishoboka"},
+  "Lade Sprachausgabe …": {"en": "Loading speech …", "fr": "Chargement de la voix …", "rw": "Ndategura ijwi …"},
+  "Sprachausgabe fehlgeschlagen: {0}": {"en": "Speech output failed: {0}", "fr": "Échec de la lecture vocale : {0}", "rw": "Gusoma mu ijwi byanze: {0}"},
+  "Sprachausgabe wird hier nicht unterstützt.": {"en": "Speech output is not supported here.", "fr": "La lecture vocale n'est pas prise en charge ici.", "rw": "Gusoma mu ijwi ntibishoboka hano."},
+  "Sprachausgabe fehlgeschlagen ({0}).": {"en": "Speech output failed ({0}).", "fr": "Échec de la lecture vocale ({0}).", "rw": "Gusoma mu ijwi byanze ({0})."},
+  "Die Sprachausgabe startet nicht. Stummschalter und Lautstärke prüfen, ggf. eine andere Stimme wählen.": {"en": "Speech does not start. Check the silent switch and volume, or choose another voice.", "fr": "La lecture ne démarre pas. Vérifiez le mode silencieux et le volume, ou choisissez une autre voix.", "rw": "Ijwi ntirikora. Genzura niba telefoni itarangwa ituje n'ijwi, cyangwa uhitemo irindi jwi."},
+  "Bild konnte nicht gelesen werden": {"en": "Image could not be read", "fr": "Impossible de lire l'image", "rw": "Ifoto ntishobora gusomwa"},
+  "Erkenne Text …": {"en": "Recognizing text …", "fr": "Reconnaissance du texte …", "rw": "Ndasoma umwandiko …"},
+  "Kein Text im Bild gefunden.": {"en": "No text found in the image.", "fr": "Aucun texte trouvé dans l'image.", "rw": "Nta mwandiko wabonetse ku ifoto."},
+  "Kategorie: {0}": {"en": "Category: {0}", "fr": "Catégorie : {0}", "rw": "Icyiciro: {0}"},
+  "Code kopiert.": {"en": "Code copied.", "fr": "Code copié.", "rw": "Kode yakoporowe."},
+  "Code kopieren": {"en": "Copy code", "fr": "Copier le code", "rw": "Koporora kode"},
+  "Zugang sperren": {"en": "Block access", "fr": "Bloquer l'accès", "rw": "Hagarika uburenganzira"},
+  "Zugang von {0} sperren?": {"en": "Block access for {0}?", "fr": "Bloquer l'accès de {0} ?", "rw": "Hagarika uburenganzira bwa {0}?"},
+  "In die Zwischenablage kopiert.": {"en": "Copied to clipboard.", "fr": "Copié dans le presse-papiers.", "rw": "Byakoporowe."},
+  "Export nicht möglich: {0}": {"en": "Export not possible: {0}", "fr": "Export impossible : {0}", "rw": "Kohereza hanze ntibishoboka: {0}"},
+  "Alle Bewertungen löschen?": {"en": "Delete all ratings?", "fr": "Supprimer toutes les évaluations ?", "rw": "Gusiba amasuzuma yose?"},
+  "Phrasenbuch konnte nicht geladen werden.": {"en": "Phrasebook could not be loaded.", "fr": "Impossible de charger le recueil de phrases.", "rw": "Igitabo cy'interuro ntikibashije gufungurwa."},
+  "✓ geprüft": {"en": "✓ verified", "fr": "✓ vérifié", "rw": "✓ byasuzumwe"},
+  "ungeprüft": {"en": "unverified", "fr": "non vérifié", "rw": "ntibirasuzumwa"},
+  "Stimmt": {"en": "Correct", "fr": "Correct", "rw": "Ni byo"},
+  "Korrigieren": {"en": "Correct it", "fr": "Corriger", "rw": "Kosora"},
+  "Richtige Übersetzung:": {"en": "Correct translation:", "fr": "Traduction correcte :", "rw": "Ubuhinduzi bukwiye:"},
+  "Du": {"en": "You", "fr": "Vous", "rw": "Wowe"},
+  "Üben": {"en": "Practice", "fr": "S'entraîner", "rw": "Itoza"},
+  "Liste löschen": {"en": "Delete list", "fr": "Supprimer la liste", "rw": "Siba urutonde"},
+  "Liste „{0}“ löschen?": {"en": "Delete list “{0}”?", "fr": "Supprimer la liste « {0} » ?", "rw": "Gusiba urutonde «{0}»?"},
+  "Titel und mindestens ein Wort nötig.": {"en": "A title and at least one word are required.", "fr": "Un titre et au moins un mot sont requis.", "rw": "Umutwe n'ijambo rimwe nibura birakenewe."},
+  "Übersetze fehlende Wörter …": {"en": "Translating missing words …", "fr": "Traduction des mots manquants …", "rw": "Ndahindura amagambo abura …"},
+  "Speichere …": {"en": "Saving …", "fr": "Enregistrement …", "rw": "Ndabika …"},
+  "Frage {0} von {1}": {"en": "Question {0} of {1}", "fr": "Question {0} sur {1}", "rw": "Ikibazo cya {0} muri {1}"},
+  "Richtig!": {"en": "Correct!", "fr": "Correct !", "rw": "Ni byo!"},
+  "Falsch. Richtig: {0}": {"en": "Wrong. Correct: {0}", "fr": "Faux. Correct : {0}", "rw": "Si byo. Igisubizo ni: {0}"},
+  "Ergebnis": {"en": "Result", "fr": "Résultat", "rw": "Umusaruro"},
+  "Fertig": {"en": "Done", "fr": "Terminé", "rw": "Birarangiye"},
+  "{0} von {1} richtig": {"en": "{0} of {1} correct", "fr": "{0} sur {1} corrects", "rw": "{0} muri {1} byari byo"},
+  "Noch nicht sicher: {0}": {"en": "Not yet sure: {0}", "fr": "Pas encore sûr : {0}", "rw": "Ntarabyemera: {0}"},
+  "Alles richtig, super!": {"en": "All correct, great!", "fr": "Tout est juste, super !", "rw": "Byose ni byo, bravo!"},
+  "Fehler wiederholen": {"en": "Repeat mistakes", "fr": "Répéter les erreurs", "rw": "Subiramo amakosa"},
+  "Erkenne Preise …": {"en": "Recognizing prices …", "fr": "Reconnaissance des prix …", "rw": "Ndasoma ibiciro …"},
+  "Keine Preise im Bild gefunden.": {"en": "No prices found in the image.", "fr": "Aucun prix trouvé dans l'image.", "rw": "Nta biciro byabonetse ku ifoto."},
+  "Version {0}": {"en": "Version {0}", "fr": "Version {0}", "rw": "Verisiyo {0}"},
+  "Alle Kategorien": {"en": "All categories", "fr": "Toutes les catégories", "rw": "Ibyiciro byose"},
+  "Alltagssprache": {"en": "Everyday language", "fr": "Langue de tous les jours", "rw": "Ururimi rwa buri munsi"},
+  "Arzt": {"en": "Doctor", "fr": "Médecin", "rw": "Muganga"},
+  "Behörde": {"en": "Authorities", "fr": "Administration", "rw": "Ubuyobozi"},
+  "Einkaufen": {"en": "Shopping", "fr": "Achats", "rw": "Guhaha"},
+  "Unterwegs": {"en": "On the go", "fr": "En déplacement", "rw": "Mu rugendo"},
+  "Sonstiges": {"en": "Other", "fr": "Autre", "rw": "Ibindi"},
+  "{0} Wörter": {"en": "{0} words", "fr": "{0} mots", "rw": "Amagambo {0}"},
+  "Falsches Passwort oder Zugangscode": {"en": "Wrong password or access code", "fr": "Mot de passe ou code d'accès incorrect", "rw": "Ijambo ry'ibanga cyangwa kode si byo"},
+  "Nur für den Admin": {"en": "Admin only", "fr": "Réservé à l'administrateur", "rw": "Ni iby'umuyobozi gusa"},
+  "Kein Text": {"en": "No text", "fr": "Pas de texte", "rw": "Nta mwandiko"},
+  "Text zu lang (max. {0} Zeichen)": {"en": "Text too long (max. {0} characters)", "fr": "Texte trop long (max. {0} caractères)", "rw": "Umwandiko muremure cyane (ntarenze inyuguti {0})"},
+  "Ungültige Sprachwahl": {"en": "Invalid language selection", "fr": "Choix de langue invalide", "rw": "Ururimi rwahiswemo ntirukwiye"},
+  "Kein Anbieter konfiguriert": {"en": "No provider configured", "fr": "Aucun fournisseur configuré", "rw": "Nta utanga serivisi washyizweho"},
+  "Raum nicht gefunden (oder abgelaufen)": {"en": "Room not found (or expired)", "fr": "Salle introuvable (ou expirée)", "rw": "Icyumba ntikibonetse (cyangwa cyararangiye)"},
+  "Raum ist voll": {"en": "Room is full", "fr": "La salle est pleine", "rw": "Icyumba cyuzuye"},
+  "Zu viele offene Räume": {"en": "Too many open rooms", "fr": "Trop de salles ouvertes", "rw": "Ibyumba bifunguye ni byinshi cyane"},
+  "Du bist nicht (mehr) in diesem Raum": {"en": "You are no longer in this room", "fr": "Vous n'êtes plus dans cette salle", "rw": "Ntukiri muri iki cyumba"},
+  "Titel fehlt": {"en": "Title missing", "fr": "Titre manquant", "rw": "Umutwe ntuhari"},
+  "Name fehlt": {"en": "Name missing", "fr": "Nom manquant", "rw": "Izina ntirihari"},
+  "Unbekannter Zugang": {"en": "Unknown access", "fr": "Accès inconnu", "rw": "Uburenganzira butazwi"},
+  "Liste nicht gefunden": {"en": "List not found", "fr": "Liste introuvable", "rw": "Urutonde ntirubonetse"},
+  "Nur Besitzer oder Admin dürfen löschen": {"en": "Only the owner or admin may delete", "fr": "Seuls le propriétaire ou l'administrateur peuvent supprimer", "rw": "Nyirarwo cyangwa umuyobozi gusa nibo bashobora gusiba"},
+  "Ungültiger Betrag": {"en": "Invalid amount", "fr": "Montant invalide", "rw": "Amafaranga adakwiye"},
+  "Unbekannter Anbieter": {"en": "Unknown provider", "fr": "Fournisseur inconnu", "rw": "Utanga serivisi utazwi"},
+  "Kein Google-Key für die Sprachausgabe": {"en": "No Google key for speech output", "fr": "Pas de clé Google pour la lecture vocale", "rw": "Nta funguro ya Google yo gusoma mu ijwi"},
+  "Bild fehlt oder ist zu groß": {"en": "Image missing or too large", "fr": "Image manquante ou trop grande", "rw": "Ifoto ibuze cyangwa ni nini cyane"},
+  "Kein Google-Key für die Texterkennung": {"en": "No Google key for text recognition", "fr": "Pas de clé Google pour la reconnaissance de texte", "rw": "Nta funguro ya Google yo gusoma umwandiko"},
+  "Einträge max. 100 Zeichen": {"en": "Entries max. 100 characters", "fr": "Entrées : 100 caractères maximum", "rw": "Buri jambo ntirirenze inyuguti 100"},
+  "Ungültige Anfrage": {"en": "Invalid request", "fr": "Requête invalide", "rw": "Ibyasabwe ntibikwiye"},
+  "Zu viele Listen": {"en": "Too many lists", "fr": "Trop de listes", "rw": "Hari urutonde rwinshi cyane"}
+};
+
+let uiLang = "de";
+try { const saved = localStorage.getItem("ui-lang"); if (UI_LANGS.includes(saved)) uiLang = saved; } catch { /* Standard: Deutsch */ }
+
+function t(key, ...args) {
+  const entry = I18N[key];
+  const text = uiLang !== "de" && entry && entry[uiLang] ? entry[uiLang] : key;
+  return text.replace(/\{(\d+)\}/g, (_, i) => (args[i] === undefined ? "" : args[i]));
+}
+
+// Meldungen vom Server (deutsch) übersetzen; Unbekanntes bleibt unverändert
+function tMsg(msg) {
+  if (I18N[msg]) return t(msg);
+  const long = /^Text zu lang \(max\. (\d+) Zeichen\)$/.exec(msg);
+  return long ? t("Text zu lang (max. {0} Zeichen)", long[1]) : msg;
+}
+
+// Statischen HTML-Text beim Laden übersetzen: Blatt-Elemente und Attribute, deren Text ein Schlüssel ist
+function applyUi() {
+  document.documentElement.lang = uiLang;
+  if (uiLang === "de") return;
+  for (const el of document.body.querySelectorAll("*")) {
+    for (const attr of ["placeholder", "title", "aria-label"]) {
+      const v = el.getAttribute(attr);
+      if (v && I18N[v]) el.setAttribute(attr, t(v));
+    }
+    if (el.children.length === 0 && !["SCRIPT", "STYLE", "OPTION", "TEXTAREA"].includes(el.tagName)) {
+      const v = el.textContent.trim();
+      if (v && I18N[v]) el.textContent = t(v);
+    }
+  }
+}

@@ -236,3 +236,74 @@ def test_vocab_lists(web, monkeypatch):
     assert web.delete(f"/api/lists/{mine['id']}", headers=ha).status_code == 200
     assert web.delete(f"/api/lists/{made['id']}", headers=H).status_code == 200
     assert web.delete("/api/lists/nope", headers=H).status_code == 404
+
+
+def _i18n_entries():
+    import json
+    import re
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[2] / "frontend" / "i18n.js").read_text(encoding="utf-8")
+    entries = {}
+    for line in text.splitlines():
+        m = re.match(r'^  ("(?:[^"\\]|\\.)*"): (\{.*\}),$', line)
+        if m:
+            entries[json.loads(m.group(1))] = json.loads(m.group(2))
+    return entries
+
+
+def test_i18n_complete():
+    import re
+
+    entries = _i18n_entries()
+    assert len(entries) > 100
+    for key, tr in entries.items():
+        assert set(tr) == {"en", "fr", "rw"} and all(v.strip() for v in tr.values()), key
+        for v in tr.values():
+            assert sorted(re.findall(r"\{\d+\}", v)) == sorted(re.findall(r"\{\d+\}", key)), key
+
+
+def test_i18n_covers_html_and_server_messages():
+    import re
+    from html.parser import HTMLParser
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    entries = _i18n_entries()
+    skip = {"Ikiraro", "Mukunzi Talk", "RWF", "EUR"}
+
+    class Collect(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.stack, self.found = [], []
+
+        def handle_starttag(self, tag, attrs):
+            for k, v in attrs:
+                if k in ("placeholder", "title", "aria-label") and v and re.search("[A-Za-z]{3}", v):
+                    self.found.append(v)
+            if tag in ("script", "style", "svg", "title", "h1"):
+                self.stack.append([tag, 0, ""])
+            elif tag not in ("input", "meta", "link", "use", "path", "br", "textarea"):
+                if self.stack:
+                    self.stack[-1][1] += 1
+                self.stack.append([tag, 0, ""])
+
+        def handle_endtag(self, tag):
+            if self.stack and self.stack[-1][0] == tag:
+                t, kids, text = self.stack.pop()
+                if t not in ("script", "style", "svg", "title", "h1") and kids == 0 and text.strip():
+                    self.found.append(text.strip())
+
+        def handle_data(self, data):
+            if self.stack:
+                self.stack[-1][2] += data
+
+    parser = Collect()
+    parser.feed((root / "frontend" / "index.html").read_text(encoding="utf-8"))
+    missing = [s for s in parser.found if s not in entries and s not in skip and re.search("[A-Za-z]{3}", s) and s != "0 / 2000"]
+    assert not missing, missing
+
+    main = (root / "backend" / "main.py").read_text(encoding="utf-8")
+    messages = re.findall(r'HTTPException\(\d+, "([^"{]+)"\)', main)
+    messages += re.findall(r'raise RoomError\("([^"{]+)"\)', (root / "backend" / "rooms.py").read_text(encoding="utf-8"))
+    assert [m for m in messages if m not in entries] == []
