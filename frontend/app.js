@@ -154,7 +154,7 @@ async function speakAny(text, code, voiceName) {
   if (serverTts) {
     setStatus("Lade Sprachausgabe …");
     try { await speakServer(text, code); setStatus(""); } catch (e) {
-      setStatus("Sprachausgabe fehlgeschlagen: " + e.message + ". Ist die Text-to-Speech-API im Google-Projekt aktiviert?");
+      setStatus("Sprachausgabe fehlgeschlagen: " + e.message + "");
     }
     return;
   }

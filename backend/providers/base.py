@@ -1,5 +1,7 @@
 import httpx
 
+from ..httperror import describe
+
 LANG_NAMES = {"de": "German", "fr": "French", "en": "English", "rw": "Kinyarwanda"}
 LANGUAGES = list(LANG_NAMES)
 
@@ -29,8 +31,10 @@ class Provider:
             resp = self.client.post(url, **kwargs)
             resp.raise_for_status()
             return resp.json()
+        except httpx.HTTPStatusError as exc:
+            raise ProviderError(f"{self.name}: {describe(exc)}") from exc
         except httpx.HTTPError as exc:
-            raise ProviderError(f"{self.name}: {exc.__class__.__name__}") from exc
+            raise ProviderError(f"{self.name}: nicht erreichbar") from exc
 
     def _prompt(self, source: str, target: str) -> str:
         return SYSTEM_PROMPT.format(source=LANG_NAMES[source], target=LANG_NAMES[target])
