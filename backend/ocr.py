@@ -1,6 +1,7 @@
 import httpx
 
 from .config import env
+from .httperror import describe
 
 VISION_URL = "https://vision.googleapis.com/v1/images:annotate"
 MAX_IMAGE_BASE64 = 6_000_000  # ca. 4,5 MB Bild; das Frontend verkleinert vorher
@@ -25,7 +26,7 @@ def detect_text(image_base64: str, client: httpx.Client | None = None) -> str:
         resp.raise_for_status()
         result = resp.json()["responses"][0]
     except httpx.HTTPStatusError as exc:
-        raise OCRError(f"Google Cloud Vision: HTTP {exc.response.status_code}") from exc
+        raise OCRError(f"Google Cloud Vision: {describe(exc)}") from exc
     except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
         raise OCRError("Google Cloud Vision nicht erreichbar") from exc
     if "error" in result:

@@ -137,3 +137,14 @@ def test_ocr_endpoint(web, monkeypatch):
 
 def test_english_supported(web):
     assert "en" in web.get("/api/providers", headers=H).json()["languages"]
+
+
+def test_provider_error_shows_google_message():
+    from backend.providers import ProviderError
+
+    def handler(request):
+        return httpx.Response(403, json={"error": {"message": "Requests to this API are blocked."}})
+
+    p = GoogleTranslate("k", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    with pytest.raises(ProviderError, match="HTTP 403: Requests to this API are blocked"):
+        p.translate("Hallo", "de", "rw")

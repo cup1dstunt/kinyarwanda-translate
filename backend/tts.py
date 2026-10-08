@@ -3,6 +3,7 @@ import base64
 import httpx
 
 from .config import env
+from .httperror import describe
 
 TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
 VOICE_LANGS = {"de": "de-DE", "fr": "fr-FR", "en": "en-US"}  # Kinyarwanda wird nicht vorgelesen
@@ -33,6 +34,6 @@ def synthesize(text: str, lang: str, client: httpx.Client | None = None) -> byte
         resp.raise_for_status()
         return base64.b64decode(resp.json()["audioContent"])
     except httpx.HTTPStatusError as exc:
-        raise TTSError(f"Google Text-to-Speech: HTTP {exc.response.status_code}") from exc
+        raise TTSError(f"Google Text-to-Speech: {describe(exc)}") from exc
     except (httpx.HTTPError, KeyError, ValueError) as exc:
         raise TTSError("Google Text-to-Speech nicht erreichbar") from exc
