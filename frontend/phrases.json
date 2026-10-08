@@ -1,0 +1,373 @@
+[
+ {
+  "c": "Alltagssprache",
+  "de": "Hallo",
+  "fr": "Bonjour / Salut",
+  "en": "Hello",
+  "rw": "Muraho"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Guten Morgen",
+  "fr": "Bonjour (le matin)",
+  "en": "Good morning",
+  "rw": "Mwaramutse"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Guten Tag",
+  "fr": "Bonjour",
+  "en": "Good afternoon",
+  "rw": "Muraho"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Guten Abend",
+  "fr": "Bonsoir",
+  "en": "Good evening",
+  "rw": "Mwiriwe"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Gute Nacht",
+  "fr": "Bonne nuit",
+  "en": "Good night",
+  "rw": "Murare neza"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Wie geht es dir?",
+  "fr": "Comment vas-tu ?",
+  "en": "How are you?",
+  "rw": "Amakuru?"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Gut, danke",
+  "fr": "Bien, merci",
+  "en": "Fine, thank you",
+  "rw": "Ni meza, murakoze"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Ich heiße …",
+  "fr": "Je m'appelle …",
+  "en": "My name is …",
+  "rw": "Nitwa …"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Ich komme aus Deutschland",
+  "fr": "Je viens d'Allemagne",
+  "en": "I come from Germany",
+  "rw": "Nkomoka mu Budage"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Freut mich, Sie kennenzulernen",
+  "fr": "Enchanté de vous rencontrer",
+  "en": "Nice to meet you",
+  "rw": "Nishimiye kubabona"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Danke",
+  "fr": "Merci",
+  "en": "Thank you",
+  "rw": "Murakoze"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Vielen Dank",
+  "fr": "Merci beaucoup",
+  "en": "Thank you very much",
+  "rw": "Murakoze cyane"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Gern geschehen",
+  "fr": "Je vous en prie",
+  "en": "You're welcome",
+  "rw": "Nta kibazo"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Entschuldigung",
+  "fr": "Excusez-moi",
+  "en": "Excuse me / Sorry",
+  "rw": "Mbabarira"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Ja",
+  "fr": "Oui",
+  "en": "Yes",
+  "rw": "Yego"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Nein",
+  "fr": "Non",
+  "en": "No",
+  "rw": "Oya"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Ich verstehe nicht",
+  "fr": "Je ne comprends pas",
+  "en": "I don't understand",
+  "rw": "Simbyumva"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Können Sie das wiederholen?",
+  "fr": "Pouvez-vous répéter ?",
+  "en": "Can you repeat that?",
+  "rw": "Mwabisubiramo?"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Sprechen Sie Englisch?",
+  "fr": "Parlez-vous anglais ?",
+  "en": "Do you speak English?",
+  "rw": "Muvuga Icyongereza?"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Auf Wiedersehen",
+  "fr": "Au revoir",
+  "en": "Goodbye",
+  "rw": "Murabeho"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich brauche einen Arzt",
+  "fr": "J'ai besoin d'un médecin",
+  "en": "I need a doctor",
+  "rw": "Nkeneye muganga"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich habe Schmerzen",
+  "fr": "J'ai mal",
+  "en": "I am in pain",
+  "rw": "Ndababara"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich habe Kopfschmerzen",
+  "fr": "J'ai mal à la tête",
+  "en": "I have a headache",
+  "rw": "Ndwaye umutwe"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich habe Bauchschmerzen",
+  "fr": "J'ai mal au ventre",
+  "en": "I have a stomach ache",
+  "rw": "Ndwaye mu nda"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich habe Fieber",
+  "fr": "J'ai de la fièvre",
+  "en": "I have a fever",
+  "rw": "Mfite umuriro"
+ },
+ {
+  "c": "Arzt",
+  "de": "Mir ist übel",
+  "fr": "J'ai la nausée",
+  "en": "I feel sick",
+  "rw": "Mfite iseseme"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich brauche Medikamente",
+  "fr": "J'ai besoin de médicaments",
+  "en": "I need medication",
+  "rw": "Nkeneye imiti"
+ },
+ {
+  "c": "Arzt",
+  "de": "Wo ist die Apotheke?",
+  "fr": "Où est la pharmacie ?",
+  "en": "Where is the pharmacy?",
+  "rw": "Farumasi iri he?"
+ },
+ {
+  "c": "Arzt",
+  "de": "Ich bin allergisch",
+  "fr": "Je suis allergique",
+  "en": "I am allergic",
+  "rw": "Mfite allergie"
+ },
+ {
+  "c": "Arzt",
+  "de": "Es ist ein Notfall",
+  "fr": "C'est une urgence",
+  "en": "It is an emergency",
+  "rw": "Ni ibyihutirwa"
+ },
+ {
+  "c": "Behörde",
+  "de": "Ich habe einen Termin",
+  "fr": "J'ai un rendez-vous",
+  "en": "I have an appointment",
+  "rw": "Mfite gahunda"
+ },
+ {
+  "c": "Behörde",
+  "de": "Hier ist mein Pass",
+  "fr": "Voici mon passeport",
+  "en": "Here is my passport",
+  "rw": "Dore pasiporo yanjye"
+ },
+ {
+  "c": "Behörde",
+  "de": "Ich möchte mein Visum verlängern",
+  "fr": "Je voudrais prolonger mon visa",
+  "en": "I would like to extend my visa",
+  "rw": "Ndashaka kongera visa yanjye"
+ },
+ {
+  "c": "Behörde",
+  "de": "Welche Unterlagen brauche ich?",
+  "fr": "De quels documents ai-je besoin ?",
+  "en": "Which documents do I need?",
+  "rw": "Nkeneye izihe nyandiko?"
+ },
+ {
+  "c": "Behörde",
+  "de": "Wo muss ich unterschreiben?",
+  "fr": "Où dois-je signer ?",
+  "en": "Where do I have to sign?",
+  "rw": "Nsinyira he?"
+ },
+ {
+  "c": "Behörde",
+  "de": "Wie lange dauert das?",
+  "fr": "Combien de temps cela prend-il ?",
+  "en": "How long does it take?",
+  "rw": "Bizatwara igihe kingana iki?"
+ },
+ {
+  "c": "Behörde",
+  "de": "Wo ist das Büro?",
+  "fr": "Où est le bureau ?",
+  "en": "Where is the office?",
+  "rw": "Ibiro biri he?"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Wie viel kostet das?",
+  "fr": "Combien ça coûte ?",
+  "en": "How much is this?",
+  "rw": "Ibi ni angahe?"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Das ist zu teuer",
+  "fr": "C'est trop cher",
+  "en": "That is too expensive",
+  "rw": "Birahenze cyane"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Können Sie den Preis senken?",
+  "fr": "Pouvez-vous baisser le prix ?",
+  "en": "Can you lower the price?",
+  "rw": "Mwagabanya igiciro?"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Ich nehme das",
+  "fr": "Je prends ça",
+  "en": "I'll take this",
+  "rw": "Ndabifata"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Haben Sie Wechselgeld?",
+  "fr": "Avez-vous de la monnaie ?",
+  "en": "Do you have change?",
+  "rw": "Mufite chenji?"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Ich möchte Wasser",
+  "fr": "Je voudrais de l'eau",
+  "en": "I would like water",
+  "rw": "Ndashaka amazi"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Ich möchte bezahlen",
+  "fr": "Je voudrais payer",
+  "en": "I would like to pay",
+  "rw": "Ndashaka kwishyura"
+ },
+ {
+  "c": "Einkaufen",
+  "de": "Kann ich mit Karte zahlen?",
+  "fr": "Puis-je payer par carte ?",
+  "en": "Can I pay by card?",
+  "rw": "Nshobora kwishyura n'ikarita?"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Wo ist die Toilette?",
+  "fr": "Où sont les toilettes ?",
+  "en": "Where is the toilet?",
+  "rw": "Ubwiherero buri he?"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Ich suche das Hotel",
+  "fr": "Je cherche l'hôtel",
+  "en": "I am looking for the hotel",
+  "rw": "Ndashaka hoteli"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Links",
+  "fr": "À gauche",
+  "en": "Left",
+  "rw": "Ibumoso"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Rechts",
+  "fr": "À droite",
+  "en": "Right",
+  "rw": "Iburyo"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Geradeaus",
+  "fr": "Tout droit",
+  "en": "Straight ahead",
+  "rw": "Komeza imbere"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Bitte hier anhalten",
+  "fr": "Arrêtez-vous ici, s'il vous plaît",
+  "en": "Please stop here",
+  "rw": "Hagarara hano"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Wie weit ist es?",
+  "fr": "C'est à quelle distance ?",
+  "en": "How far is it?",
+  "rw": "Ni kure kangana iki?"
+ },
+ {
+  "c": "Unterwegs",
+  "de": "Wie viel kostet die Fahrt?",
+  "fr": "Combien coûte le trajet ?",
+  "en": "How much is the ride?",
+  "rw": "Urugendo ni angahe?"
+ }
+]

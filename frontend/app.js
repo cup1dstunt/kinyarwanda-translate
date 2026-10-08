@@ -32,7 +32,7 @@ function fill(select, values, label = (v) => v) {
   }));
 }
 
-const TABS = { translate: "translate", chat: "chat", favs: "favs", currency: "currency" };
+const TABS = { translate: "translate", chat: "chat", phrases: "phrases", favs: "favs", currency: "currency" };
 
 function showLogin() {
   $("login").hidden = false; $("tabbar").hidden = true;
@@ -47,6 +47,7 @@ function showTab(name) {
     $("tab-" + tab).classList.toggle("active", tab === name);
   }
   if (name === "favs") renderFavs();
+  if (name === "phrases") loadPhrases();
   setStatus("");
 }
 
@@ -82,6 +83,7 @@ $("tab-translate").onclick = () => showTab("translate");
 $("tab-currency").onclick = () => showTab("currency");
 $("tab-chat").onclick = () => showTab("chat");
 $("tab-favs").onclick = () => showTab("favs");
+$("tab-phrases").onclick = () => showTab("phrases");
 
 async function translate() {
   if (!$("input").value.trim()) return;
@@ -388,13 +390,17 @@ function mkBtn(icon, label, onclick, disabled = false) {
 
 // --- Bewertung durch Muttersprachler (für den Qualitätstest) ---
 
-function saveRating(good, correction) {
+function addRating(entry) {
   const list = loadJson("ratings");
-  list.push({
-    time: new Date().toISOString(), provider: $("provider").value || "", source: $("source").value, target: $("target").value,
+  list.push({ time: new Date().toISOString(), ...entry });
+  store.set("ratings", JSON.stringify(list));
+}
+
+function saveRating(good, correction) {
+  addRating({
+    provider: $("provider").value || "", source: $("source").value, target: $("target").value,
     input: $("input").value, output: $("output").value, good, correction,
   });
-  store.set("ratings", JSON.stringify(list));
 }
 
 $("rate-up").onclick = () => { saveRating(true, ""); $("rate-box").hidden = true; setStatus(""); };
@@ -427,6 +433,66 @@ $("rate-export").onclick = async () => {
 $("rate-clear").onclick = () => {
   if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); renderFavs(); }
 };
+
+// --- Phrasenbuch: fertige Sätze, Kinyarwanda ungeprüft bis zur Bestätigung ---
+let phrases = null;
+const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{}"); } catch { return {}; } };
+
+async function loadPhrases() {
+  if (!phrases) {
+    try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
+    const cats = [...new Set(phrases.map((p) => p.c))];
+    fill($("ph-cat"), cats);
+    fill($("ph-lang"), ["rw", "fr", "en"], (l) => "→ " + LANG_LABELS[l]);
+  }
+  renderPhrases();
+}
+
+function renderPhrases() {
+  if (!phrases) return;
+  const lang = $("ph-lang").value, rev = reviews();
+  $("ph-list").replaceChildren(...phrases.filter((p) => p.c === $("ph-cat").value).map((p) => {
+    const key = p.de + "|" + lang;
+    const r = rev[key];
+    const text = r && r.text ? r.text : p[lang];
+    const card = document.createElement("div");
+    card.className = "card fav";
+    const meta = document.createElement("small");
+    meta.textContent = lang === "rw" ? (r ? "✓ geprüft" : "ungeprüft") : "";
+    const de = document.createElement("div");
+    de.textContent = p.de;
+    const out = document.createElement("strong");
+    out.textContent = text;
+    const row = document.createElement("div");
+    row.className = "fav-actions";
+    const review = (good, correction) => {
+      addRating({ provider: "phrasebook", source: "de", target: lang, input: p.de, output: p[lang], good, correction });
+      const all = reviews();
+      all[key] = { text: correction || p[lang] };
+      store.set("phrase-review", JSON.stringify(all));
+      renderPhrases();
+    };
+    row.append(
+      mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
+      mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
+    );
+    if (lang === "rw") {
+      const up = document.createElement("button");
+      up.className = "icon"; up.textContent = "👍"; up.title = "Stimmt";
+      up.onclick = () => review(true, "");
+      const down = document.createElement("button");
+      down.className = "icon"; down.textContent = "👎"; down.title = "Korrigieren";
+      down.onclick = () => {
+        const fix = window.prompt("Richtige Übersetzung:", text);
+        if (fix !== null && fix.trim()) review(false, fix.trim());
+      };
+      row.append(up, down);
+    }
+    card.append(...(meta.textContent ? [meta] : []), de, out, row);
+    return card;
+  }));
+}
+$("ph-cat").onchange = $("ph-lang").onchange = renderPhrases;
 
 // --- Gesprächsmodus: zwei Sprachen, abwechselnd ---
 let who = "a";
