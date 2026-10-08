@@ -26,6 +26,7 @@
   <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5ZM12 6.500v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3m-7 0 1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
@@ -111,6 +112,15 @@
       </div>
     </section>
 
+    <section id="phrases" class="view" hidden>
+      <div class="langbar">
+        <select id="ph-cat" aria-label="Kategorie"></select>
+        <select id="ph-lang" aria-label="Sprache"></select>
+      </div>
+      <p class="hint">Fertige Sätze, Deutsch → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.</p>
+      <div id="ph-list" class="fav-list"></div>
+    </section>
+
     <section id="favs" class="view" hidden>
       <div class="langbar">
         <select id="fav-filter" aria-label="Kategorie"></select>
@@ -148,6 +158,7 @@
   <nav class="tabbar" id="tabbar" hidden>
     <button id="tab-translate" class="active"><svg><use href="#i-translate"/></svg><span>Übersetzen</span></button>
     <button id="tab-chat"><svg><use href="#i-chat"/></svg><span>Gespräch</span></button>
+    <button id="tab-phrases"><svg><use href="#i-book"/></svg><span>Phrasen</span></button>
     <button id="tab-favs"><svg><use href="#i-star"/></svg><span>Favoriten</span></button>
     <button id="tab-currency"><svg><use href="#i-coins"/></svg><span>Währung</span></button>
   </nav>
