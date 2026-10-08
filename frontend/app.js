@@ -11,7 +11,7 @@ let password = store.get("pw");
 let serverTts = false;
 let myName = "", myAdmin = false;
 
-function setStatus(msg) { $("status").textContent = msg || ""; }
+function setStatus(msg) { $("status").textContent = msg ? tMsg(msg) : ""; }
 
 async function api(path, body) {
   const res = await fetch(path, {
@@ -21,7 +21,7 @@ async function api(path, body) {
   });
   if (res.status === 401) { store.del("pw"); showLogin(); throw new Error("Bitte anmelden"); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || "Fehler " + res.status);
+  if (!res.ok) throw new Error(data.detail || t("Fehler {0}", res.status));
   return data;
 }
 
@@ -60,7 +60,7 @@ async function init() {
     const info = await api("/api/providers");
     fill($("source"), info.languages, (l) => LANG_LABELS[l]);
     fill($("target"), info.languages, (l) => LANG_LABELS[l]);
-    $("source").value = "de"; $("target").value = "rw";
+    $("source").value = uiLang; $("target").value = uiLang === "rw" ? "de" : "rw";
     fill($("provider"), info.providers);
     if (info.default) $("provider").value = info.default;
     $("provider").hidden = info.providers.length < 2;
@@ -70,15 +70,15 @@ async function init() {
     $("price-btn").hidden = !info.ocr;
     fill($("learn-src"), info.languages, (l) => LANG_LABELS[l]);
     fill($("learn-tgt"), info.languages, (l) => LANG_LABELS[l]);
-    $("learn-src").value = "de"; $("learn-tgt").value = "rw";
+    $("learn-src").value = uiLang; $("learn-tgt").value = uiLang === "rw" ? "de" : "rw";
     myName = info.me ? info.me.name : "";
     myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
-    $("room-lang").value = store.get("room-lang") || "de";
+    $("room-lang").value = store.get("room-lang") || uiLang;
     resumeRoom();
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
     fill($("conv-b"), info.languages, (l) => LANG_LABELS[l]);
-    $("conv-a").value = "de"; $("conv-b").value = "rw";
+    $("conv-a").value = uiLang; $("conv-b").value = uiLang === "rw" ? "de" : "rw";
     updateWho();
     showTab("translate");
     updateControls();
@@ -169,7 +169,7 @@ async function speakServer(text, code) {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Fehler " + res.status);
+    throw new Error(data.detail || t("Fehler {0}", res.status));
   }
   const url = URL.createObjectURL(await res.blob());
   audio.src = url;
@@ -181,7 +181,7 @@ async function speakAny(text, code, voiceName) {
   if (serverTts) {
     setStatus("Lade Sprachausgabe …");
     try { await speakServer(text, code); setStatus(""); } catch (e) {
-      setStatus("Sprachausgabe fehlgeschlagen: " + e.message + "");
+      setStatus(t("Sprachausgabe fehlgeschlagen: {0}", e.message));
     }
     return;
   }
@@ -204,7 +204,7 @@ function speak(text, code, voiceName) {
     let started = false;
     u.onstart = () => { started = true; setStatus(""); };
     u.onerror = (e) => {
-      if (e.error !== "canceled" && e.error !== "interrupted") setStatus("Sprachausgabe fehlgeschlagen (" + e.error + ").");
+      if (e.error !== "canceled" && e.error !== "interrupted") setStatus(t("Sprachausgabe fehlgeschlagen ({0}).", e.error));
     };
     synth.speak(u);
     setTimeout(() => {
@@ -332,7 +332,7 @@ $("zoom").onclick = () => { $("zoom").hidden = true; };
 $("show").onclick = () => zoom($("output").value);
 
 // --- Favoriten / Phrasebook (lokal, auch offline nutzbar) ---
-const CATEGORIES = ["Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"];
+const CATEGORIES = ["Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
 
 function loadJson(key) {
   try { return JSON.parse(store.get(key) || "[]"); } catch { return []; }
@@ -347,9 +347,9 @@ function addFav(cat) {
 }
 
 $("fav").onclick = () => {
-  const cat = window.prompt("Kategorie: " + CATEGORIES.join(", "), store.get("last-cat") || CATEGORIES[0]);
+  const cat = window.prompt(t("Kategorie: {0}", CATEGORIES.map((c) => t(c)).join(", ")), t(store.get("last-cat") || CATEGORIES[0]));
   if (cat === null) return;
-  const match = CATEGORIES.find((c) => c.toLowerCase() === cat.trim().toLowerCase());
+  const match = CATEGORIES.find((c) => [c, t(c)].some((n) => n.toLowerCase() === cat.trim().toLowerCase()));
   const chosen = match || cat.trim() || "Sonstiges";
   store.set("last-cat", chosen);
   addFav(chosen);
@@ -362,7 +362,7 @@ function renderFavs() {
   const all = loadJson("favs");
   const cats = [...new Set([...CATEGORIES, ...all.map((f) => f.cat)])];
   const current = $("fav-filter").value || "";
-  fill($("fav-filter"), ["", ...cats], (c) => c || "Alle Kategorien");
+  fill($("fav-filter"), ["", ...cats], (c) => t(c || "Alle Kategorien"));
   $("fav-filter").value = cats.includes(current) ? current : "";
   const shown = all.filter((f) => !$("fav-filter").value || f.cat === $("fav-filter").value);
   $("fav-empty").hidden = shown.length > 0;
@@ -370,7 +370,7 @@ function renderFavs() {
     const card = document.createElement("div");
     card.className = "card fav";
     const meta = document.createElement("small");
-    meta.textContent = `${f.cat} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
+    meta.textContent = `${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
     const inp = document.createElement("div");
     inp.textContent = f.input;
     const out = document.createElement("strong");
@@ -408,7 +408,7 @@ async function renderAdmin() {
       row.append(
         mkBtn("#i-copy", "Code kopieren", () => navigator.clipboard.writeText(u.code).then(() => setStatus("Code kopiert.")).catch(() => setStatus("Kopieren nicht möglich"))),
         mkBtn("#i-trash", "Zugang sperren", async () => {
-          if (!window.confirm(`Zugang von ${u.name} sperren?`)) return;
+          if (!window.confirm(t("Zugang von {0} sperren?", u.name))) return;
           try { await fetch("/api/admin/users/" + u.id, { method: "DELETE", headers: { "X-App-Password": password } }); } catch (e) { setStatus(e.message); }
           renderAdmin();
         }),
@@ -427,7 +427,7 @@ $("admin").addEventListener("toggle", () => { if ($("admin").open) renderAdmin()
 
 function mkBtn(icon, label, onclick, disabled = false) {
   const b = document.createElement("button");
-  b.className = "icon"; b.title = label; b.setAttribute("aria-label", label);
+  b.className = "icon"; b.title = t(label); b.setAttribute("aria-label", t(label));
   b.innerHTML = `<svg><use href="${icon}"/></svg>`;
   b.onclick = onclick; b.disabled = disabled;
   return b;
@@ -472,7 +472,7 @@ $("rate-export").onclick = async () => {
     if (navigator.share) await navigator.share({ text });
     else { await navigator.clipboard.writeText(text); setStatus("In die Zwischenablage kopiert."); }
   } catch (e) {
-    if (e.name !== "AbortError") setStatus("Export nicht möglich: " + e.message);
+    if (e.name !== "AbortError") setStatus(t("Export nicht möglich: {0}", e.message));
   }
 };
 $("rate-clear").onclick = () => {
@@ -487,8 +487,10 @@ async function loadPhrases() {
   if (!phrases) {
     try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
     const cats = [...new Set(phrases.map((p) => p.c))];
-    fill($("ph-cat"), cats);
-    fill($("ph-lang"), ["rw", "fr", "en"], (l) => "→ " + LANG_LABELS[l]);
+    fill($("ph-cat"), cats, (c) => t(c));
+    const targets = UI_LANGS.filter((l) => l !== uiLang);
+    fill($("ph-lang"), targets, (l) => "→ " + LANG_LABELS[l]);
+    $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
   }
   renderPhrases();
 }
@@ -496,6 +498,7 @@ async function loadPhrases() {
 function renderPhrases() {
   if (!phrases) return;
   const lang = $("ph-lang").value, rev = reviews();
+  $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
   $("ph-list").replaceChildren(...phrases.filter((p) => p.c === $("ph-cat").value).map((p) => {
     const key = p.de + "|" + lang;
     const r = rev[key];
@@ -503,15 +506,15 @@ function renderPhrases() {
     const card = document.createElement("div");
     card.className = "card fav";
     const meta = document.createElement("small");
-    meta.textContent = lang === "rw" ? (r ? "✓ geprüft" : "ungeprüft") : "";
+    meta.textContent = lang === "rw" ? t(r ? "✓ geprüft" : "ungeprüft") : "";
     const de = document.createElement("div");
-    de.textContent = p.de;
+    de.textContent = p[uiLang];
     const out = document.createElement("strong");
     out.textContent = text;
     const row = document.createElement("div");
     row.className = "fav-actions";
     const review = (good, correction) => {
-      addRating({ provider: "phrasebook", source: "de", target: lang, input: p.de, output: p[lang], good, correction });
+      addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
       const all = reviews();
       all[key] = { text: correction || p[lang] };
       store.set("phrase-review", JSON.stringify(all));
@@ -523,12 +526,12 @@ function renderPhrases() {
     );
     if (lang === "rw") {
       const up = document.createElement("button");
-      up.className = "icon"; up.textContent = "👍"; up.title = "Stimmt";
+      up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
       up.onclick = () => review(true, "");
       const down = document.createElement("button");
-      down.className = "icon"; down.textContent = "👎"; down.title = "Korrigieren";
+      down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
       down.onclick = () => {
-        const fix = window.prompt("Richtige Übersetzung:", text);
+        const fix = window.prompt(t("Richtige Übersetzung:"), text);
         if (fix !== null && fix.trim()) review(false, fix.trim());
       };
       row.append(up, down);
@@ -615,21 +618,21 @@ async function loadLists() {
       const card = document.createElement("div");
       card.className = "card fav";
       const meta = document.createElement("small");
-      meta.textContent = `${l.owner} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${l.items.length} Wörter`;
+      meta.textContent = `${l.owner} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
       const title = document.createElement("strong");
       title.textContent = l.title;
       const row = document.createElement("div");
       row.className = "fav-actions learn-actions";
       const start = document.createElement("button");
-      start.className = "primary"; start.textContent = "Üben";
+      start.className = "primary"; start.textContent = t("Üben");
       start.onclick = () => startQuiz(l);
       row.append(start);
       if (myAdmin || l.owner === myName) {
         row.append(mkBtn("#i-trash", "Liste löschen", async () => {
-          if (!window.confirm(`Liste „${l.title}“ löschen?`)) return;
+          if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
           try {
             const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
-            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Fehler " + res.status);
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
           } catch (e) { setStatus(e.message); }
           loadLists();
         }));
@@ -678,7 +681,7 @@ function startQuiz(list, only) {
 
 function showQuestion() {
   const q = quiz.questions[quiz.i];
-  $("quiz-progress").textContent = `Frage ${quiz.i + 1} von ${quiz.questions.length}`;
+  $("quiz-progress").textContent = t("Frage {0} von {1}", quiz.i + 1, quiz.questions.length);
   $("quiz-question").textContent = q.q;
   $("quiz-feedback").textContent = "";
   $("quiz-feedback").className = "quiz-fb";
@@ -705,12 +708,12 @@ function answer(given) {
   const q = quiz.questions[quiz.i];
   const ok = norm(given) === norm(q.a);
   if (ok) quiz.right++; else quiz.wrong.push(quiz.list.items.find((it) => it.a === q.q || it.b === q.q));
-  $("quiz-feedback").textContent = ok ? "Richtig!" : `Falsch. Richtig: ${q.a}`;
+  $("quiz-feedback").textContent = ok ? t("Richtig!") : t("Falsch. Richtig: {0}", q.a);
   $("quiz-feedback").className = "quiz-fb " + (ok ? "ok" : "bad");
   for (const b of $("quiz-options").children) { b.disabled = true; if (norm(b.textContent) === norm(q.a)) b.classList.add("right"); }
   $("quiz-input").disabled = true; $("quiz-check").disabled = true;
   $("quiz-next").hidden = false;
-  $("quiz-next").textContent = quiz.i + 1 < quiz.questions.length ? "Weiter" : "Ergebnis";
+  $("quiz-next").textContent = t(quiz.i + 1 < quiz.questions.length ? "Weiter" : "Ergebnis");
   $("quiz-next").focus();
 }
 
@@ -719,13 +722,13 @@ $("quiz-input").onkeydown = (e) => { if (e.key === "Enter") $("quiz-check").clic
 $("quiz-next").onclick = () => {
   if (quiz.i + 1 < quiz.questions.length) { quiz.i++; showQuestion(); return; }
   const total = quiz.questions.length;
-  $("quiz-progress").textContent = "Fertig";
-  $("quiz-question").textContent = `${quiz.right} von ${total} richtig`;
+  $("quiz-progress").textContent = t("Fertig");
+  $("quiz-question").textContent = t("{0} von {1} richtig", quiz.right, total);
   $("quiz-options").hidden = true; $("quiz-typed").hidden = true;
   $("quiz-feedback").className = "quiz-fb";
-  $("quiz-feedback").textContent = quiz.wrong.length ? "Noch nicht sicher: " + quiz.wrong.map((w) => `${w.a} = ${w.b}`).join(", ") : "Alles richtig, super!";
+  $("quiz-feedback").textContent = quiz.wrong.length ? t("Noch nicht sicher: {0}", quiz.wrong.map((w) => `${w.a} = ${w.b}`).join(", ")) : t("Alles richtig, super!");
   if (quiz.wrong.length) {
-    $("quiz-next").textContent = "Fehler wiederholen";
+    $("quiz-next").textContent = t("Fehler wiederholen");
     $("quiz-next").onclick = () => { const l = quiz.list, w = quiz.wrong; $("quiz-next").onclick = nextHandler; startQuiz(l, w); };
   } else { $("quiz-next").hidden = true; }
   if (quiz.wrong.length) $("quiz-next").hidden = false;
@@ -800,7 +803,7 @@ function addRoomBubble(m) {
   const div = document.createElement("div");
   div.className = "bubble " + (m.mine ? "b" : "a");
   const who = document.createElement("small");
-  who.textContent = m.mine ? "Du" : m.name;
+  who.textContent = m.mine ? t("Du") : m.name;
   const big = document.createElement("div");
   big.className = "big-text";
   big.textContent = m.text;
@@ -881,9 +884,16 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
+applyUi();
+$("tab-favs").querySelector("span").textContent = t("Favoriten/Einstellungen").replace("/", "/\u200b"); // darf nach dem Schrägstrich umbrechen
 renderHistory();
 updateControls();
 
-fetch("/health").then((r) => r.json()).then((h) => { $("version").textContent = "Version " + h.version; }).catch(() => {});
+fetch("/health").then((r) => r.json()).then((h) => { $("version").textContent = t("Version {0}", h.version); }).catch(() => {});
+
+// App-Sprache (gilt pro Gerät): Auswahl speichern und neu laden, damit alle Texte neu aufgebaut werden
+fill($("ui-lang"), UI_LANGS, (l) => UI_NAMES[l]);
+$("ui-lang").value = uiLang;
+$("ui-lang").onchange = () => { store.set("ui-lang", $("ui-lang").value); location.reload(); };
 
 init();
