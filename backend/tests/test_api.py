@@ -215,3 +215,24 @@ def test_room_errors(web):
     code = web.post("/api/rooms", headers=H, json={"cid": "a" * 12, "lang": "de"}).json()["room"]
     r = web.get(f"/api/rooms/{code}/messages", params={"cid": "z" * 12}, headers=H)
     assert r.status_code == 404
+
+
+def test_vocab_lists(web, monkeypatch):
+    class Fake:
+        def translate(self, text, source, target):
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    body = {"title": "Markt", "source": "de", "target": "rw",
+            "items": [{"a": "Wasser", "b": "amazi"}, {"a": "Brot"}, {"a": "  "}]}
+    made = web.post("/api/lists", headers=H, json=body).json()
+    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
+    code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    ha = {"X-App-Password": code}
+    assert web.get("/api/lists", headers=ha).json()["lists"][0]["owner"] == "Admin"
+    assert web.delete(f"/api/lists/{made['id']}", headers=ha).status_code == 403  # fremde Liste
+    assert web.post("/api/lists", headers=ha, json={**body, "title": ""}).status_code == 400
+    mine = web.post("/api/lists", headers=ha, json=body).json()
+    assert web.delete(f"/api/lists/{mine['id']}", headers=ha).status_code == 200
+    assert web.delete(f"/api/lists/{made['id']}", headers=H).status_code == 200
+    assert web.delete("/api/lists/nope", headers=H).status_code == 404

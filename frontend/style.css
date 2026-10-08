@@ -190,3 +190,18 @@ footer { text-align: center; }
 #chat > .seg { padding: 0; }
 #room-join { gap: 10px; }
 #room-code { min-height: 46px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); text-transform: uppercase; letter-spacing: .15em; }
+
+#phrases > .seg { padding: 0; }
+.learn-form { display: grid; gap: 10px; padding-bottom: 14px; }
+.learn-form input, .learn-form textarea { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; min-height: 46px; }
+.learn-form textarea { min-height: 150px; }
+.learn-actions { margin-left: 0; padding-bottom: 8px; align-items: center; }
+.quiz { padding: 16px; display: grid; gap: 14px; max-width: 560px; width: 100%; margin: 0 auto; }
+.quiz-top { display: flex; justify-content: space-between; align-items: center; }
+.quiz-q { font-size: 2rem; font-weight: 750; text-align: center; padding: 14px 0; overflow-wrap: anywhere; }
+.quiz-options { display: grid; gap: 10px; }
+.quiz-opt { min-height: 54px; border-radius: 14px; background: var(--chip); font-size: 1.1rem; font-weight: 600; padding: 0 14px; }
+.quiz-opt.right { background: color-mix(in srgb, #1a9d4b 30%, var(--chip)); }
+.quiz-fb { min-height: 1.4em; margin: 0; text-align: center; font-weight: 650; }
+.quiz-fb.ok { color: #1a9d4b; }
+.quiz-fb.bad { color: var(--danger); }

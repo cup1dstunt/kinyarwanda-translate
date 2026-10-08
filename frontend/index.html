@@ -140,12 +140,50 @@
     </section>
 
     <section id="phrases" class="view" hidden>
+      <div class="seg" role="group" aria-label="Bereich">
+        <button id="ph-mode-phrases" class="active">Sätze</button>
+        <button id="ph-mode-learn">Lernen</button>
+      </div>
+      <div id="ph-phrases" class="view">
       <div class="langbar">
         <select id="ph-cat" aria-label="Kategorie"></select>
         <select id="ph-lang" aria-label="Sprache"></select>
       </div>
       <p class="hint">Fertige Sätze, Deutsch → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.</p>
       <div id="ph-list" class="fav-list"></div>
+    </div>
+
+      <div id="ph-learn" class="view" hidden>
+        <div id="learn-home" class="view">
+          <div id="learn-lists" class="fav-list"></div>
+          <p id="learn-empty" class="empty">Noch keine Listen. Lege unten die erste an.</p>
+          <details class="card" id="learn-new">
+            <summary>Neue Vokabelliste</summary>
+            <div class="learn-form">
+              <input id="learn-title" type="text" placeholder="Titel, z. B. Markt" aria-label="Titel">
+              <div class="langbar">
+                <select id="learn-src" aria-label="Von"></select>
+                <span>→</span>
+                <select id="learn-tgt" aria-label="Nach"></select>
+              </div>
+              <textarea id="learn-items" placeholder="Eine Zeile pro Wort:&#10;Wasser = amazi&#10;Brot&#10;(ohne „=“ wird automatisch übersetzt)" aria-label="Wörter"></textarea>
+              <button id="learn-save" class="primary">Liste speichern</button>
+            </div>
+          </details>
+        </div>
+
+        <div id="quiz" class="card quiz" hidden>
+          <div class="quiz-top"><small id="quiz-progress"></small><button id="quiz-stop" class="ghost">Beenden</button></div>
+          <div id="quiz-question" class="quiz-q"></div>
+          <div id="quiz-options" class="quiz-options"></div>
+          <div id="quiz-typed" class="rate" hidden>
+            <input id="quiz-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" placeholder="Antwort eintippen" aria-label="Antwort">
+            <button id="quiz-check" class="primary">Prüfen</button>
+          </div>
+          <p id="quiz-feedback" class="quiz-fb" aria-live="polite"></p>
+          <button id="quiz-next" class="primary" hidden>Weiter</button>
+        </div>
+      </div>
     </section>
 
     <section id="favs" class="view" hidden>
