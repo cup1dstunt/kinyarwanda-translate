@@ -62,6 +62,7 @@ async function init() {
     if (info.default) $("provider").value = info.default;
     $("provider").hidden = info.providers.length < 2;
     serverTts = !!info.tts;
+    $("admin").hidden = !(info.me && info.me.admin);
     $("ocr-btn").hidden = !info.ocr;
     $("price-btn").hidden = !info.ocr;
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
@@ -379,6 +380,39 @@ function renderFavs() {
   $("rate-count").textContent = loadJson("ratings").length;
 }
 $("fav-filter").onchange = renderFavs;
+
+// --- Zugänge (nur Admin) ---
+async function renderAdmin() {
+  if ($("admin").hidden) return;
+  try {
+    const r = await api("/api/admin/users");
+    $("admin-list").replaceChildren(...r.users.map((u) => {
+      const li = document.createElement("li");
+      const name = document.createElement("strong");
+      name.textContent = u.name;
+      const code = document.createElement("small");
+      code.textContent = u.code;
+      const row = document.createElement("div");
+      row.className = "fav-actions";
+      row.append(
+        mkBtn("#i-copy", "Code kopieren", () => navigator.clipboard.writeText(u.code).then(() => setStatus("Code kopiert.")).catch(() => setStatus("Kopieren nicht möglich"))),
+        mkBtn("#i-trash", "Zugang sperren", async () => {
+          if (!window.confirm(`Zugang von ${u.name} sperren?`)) return;
+          try { await fetch("/api/admin/users/" + u.id, { method: "DELETE", headers: { "X-App-Password": password } }); } catch (e) { setStatus(e.message); }
+          renderAdmin();
+        }),
+      );
+      li.append(name, code, row);
+      return li;
+    }));
+  } catch (e) { setStatus(e.message); }
+}
+$("admin-add").onclick = async () => {
+  const name = $("admin-name").value.trim();
+  if (!name) return;
+  try { await api("/api/admin/users", { name }); $("admin-name").value = ""; renderAdmin(); } catch (e) { setStatus(e.message); }
+};
+$("admin").addEventListener("toggle", () => { if ($("admin").open) renderAdmin(); });
 
 function mkBtn(icon, label, onclick, disabled = false) {
   const b = document.createElement("button");

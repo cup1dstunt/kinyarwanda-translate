@@ -43,7 +43,8 @@ def test_openai():
 
 
 @pytest.fixture
-def web(monkeypatch):
+def web(monkeypatch, tmp_path):
+    monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("APP_PASSWORD", "pw")
     monkeypatch.setenv("GOOGLE_TRANSLATE_API_KEY", "k")
     return TestClient(app)
@@ -155,3 +156,31 @@ def test_phrasebook_complete(web):
     assert {p["c"] for p in phrases} >= {"Alltagssprache", "Arzt", "Behörde", "Einkaufen"}
     for p in phrases:
         assert all(p.get(k, "").strip() for k in ("de", "fr", "en", "rw")), p
+
+
+def test_access_codes(web):
+    code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()
+    hu = {"X-App-Password": code["code"]}
+    me = web.get("/api/providers", headers=hu).json()["me"]
+    assert me == {"name": "Anna", "admin": False}
+    assert web.get("/api/admin/users", headers=hu).status_code == 403
+    assert web.get("/api/admin/users", headers=H).json()["users"][0]["name"] == "Anna"
+    assert web.delete(f"/api/admin/users/{code['id']}", headers=H).status_code == 200
+    assert web.get("/api/providers", headers=hu).status_code == 401
+    assert web.delete("/api/admin/users/nope", headers=H).status_code == 404
+
+
+def test_translation_cache(web, monkeypatch):
+    calls = []
+
+    class Fake:
+        def translate(self, text, source, target):
+            calls.append(text)
+            return "Muraho"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    body = {"text": "Hallo", "source": "de", "target": "rw"}
+    first = web.post("/api/translate", headers=H, json=body).json()
+    second = web.post("/api/translate", headers=H, json=body).json()
+    assert first["translation"] == second["translation"] == "Muraho"
+    assert second["cached"] is True and calls == ["Hallo"]
