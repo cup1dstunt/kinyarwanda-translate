@@ -9,6 +9,7 @@ const store = {
 };
 let password = store.get("pw");
 let serverTts = false;
+let myName = "", myAdmin = false;
 
 function setStatus(msg) { $("status").textContent = msg || ""; }
 
@@ -67,6 +68,11 @@ async function init() {
     $("admin").hidden = !(info.me && info.me.admin);
     $("ocr-btn").hidden = !info.ocr;
     $("price-btn").hidden = !info.ocr;
+    fill($("learn-src"), info.languages, (l) => LANG_LABELS[l]);
+    fill($("learn-tgt"), info.languages, (l) => LANG_LABELS[l]);
+    $("learn-src").value = "de"; $("learn-tgt").value = "rw";
+    myName = info.me ? info.me.name : "";
+    myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
     $("room-lang").value = store.get("room-lang") || "de";
     resumeRoom();
@@ -589,6 +595,143 @@ function addBubble(from, to, text, translation, side) {
   div.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 $("chat-clear").onclick = () => $("chat-log").replaceChildren();
+
+// --- Lernen: Vokabellisten und Mini-Test (ganz ohne KI, nur aus der Liste) ---
+function setLearnMode(mode) {
+  $("ph-phrases").hidden = mode !== "phrases";
+  $("ph-learn").hidden = mode !== "learn";
+  $("ph-mode-phrases").classList.toggle("active", mode === "phrases");
+  $("ph-mode-learn").classList.toggle("active", mode === "learn");
+  if (mode === "learn") loadLists();
+}
+$("ph-mode-phrases").onclick = () => setLearnMode("phrases");
+$("ph-mode-learn").onclick = () => setLearnMode("learn");
+
+async function loadLists() {
+  try {
+    const r = await api("/api/lists");
+    $("learn-empty").hidden = r.lists.length > 0;
+    $("learn-lists").replaceChildren(...r.lists.map((l) => {
+      const card = document.createElement("div");
+      card.className = "card fav";
+      const meta = document.createElement("small");
+      meta.textContent = `${l.owner} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${l.items.length} Wörter`;
+      const title = document.createElement("strong");
+      title.textContent = l.title;
+      const row = document.createElement("div");
+      row.className = "fav-actions learn-actions";
+      const start = document.createElement("button");
+      start.className = "primary"; start.textContent = "Üben";
+      start.onclick = () => startQuiz(l);
+      row.append(start);
+      if (myAdmin || l.owner === myName) {
+        row.append(mkBtn("#i-trash", "Liste löschen", async () => {
+          if (!window.confirm(`Liste „${l.title}“ löschen?`)) return;
+          try {
+            const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || "Fehler " + res.status);
+          } catch (e) { setStatus(e.message); }
+          loadLists();
+        }));
+      }
+      card.append(meta, title, row);
+      return card;
+    }));
+  } catch (e) { setStatus(e.message); }
+}
+
+$("learn-save").onclick = async () => {
+  const items = $("learn-items").value.split("\n").map((line) => {
+    const [a, ...rest] = line.split("=");
+    return { a: a.trim(), b: rest.join("=").trim() };
+  }).filter((i) => i.a);
+  if (!$("learn-title").value.trim() || !items.length) { setStatus("Titel und mindestens ein Wort nötig."); return; }
+  $("learn-save").disabled = true;
+  setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
+  try {
+    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, items });
+    $("learn-title").value = ""; $("learn-items").value = "";
+    $("learn-new").open = false;
+    setStatus("");
+    loadLists();
+  } catch (e) { setStatus(e.message); }
+  $("learn-save").disabled = false;
+};
+
+const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+let quiz = null;
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function startQuiz(list, only) {
+  const items = only || list.items;
+  // Multiple Choice ab 3 Wörtern, sonst Eintippen; abwechselnd beide Richtungen
+  const questions = shuffle(items.map((it, i) => (i % 2 ? { q: it.b, a: it.a, ql: list.target, al: list.source } : { q: it.a, a: it.b, ql: list.source, al: list.target })));
+  quiz = { list, questions, i: 0, wrong: [], right: 0, typed: false };
+  $("learn-home").hidden = true;
+  $("quiz").hidden = false;
+  showQuestion();
+}
+
+function showQuestion() {
+  const q = quiz.questions[quiz.i];
+  $("quiz-progress").textContent = `Frage ${quiz.i + 1} von ${quiz.questions.length}`;
+  $("quiz-question").textContent = q.q;
+  $("quiz-feedback").textContent = "";
+  $("quiz-feedback").className = "quiz-fb";
+  $("quiz-next").hidden = true;
+  const pool = quiz.list.items.map((it) => (q.al === quiz.list.target ? it.b : it.a)); // Falschantworten nur in der Antwortsprache
+  const distractors = shuffle([...new Set(pool.filter((w) => norm(w) !== norm(q.a) && norm(w) !== norm(q.q)))]).slice(0, 3);
+  quiz.typed = quiz.questions.length < 3 || distractors.length < 2;
+  $("quiz-typed").hidden = !quiz.typed;
+  $("quiz-options").hidden = quiz.typed;
+  if (quiz.typed) {
+    $("quiz-input").value = ""; $("quiz-input").disabled = false; $("quiz-check").disabled = false;
+    $("quiz-input").focus();
+  } else {
+    $("quiz-options").replaceChildren(...shuffle([q.a, ...distractors]).map((w) => {
+      const b = document.createElement("button");
+      b.className = "quiz-opt"; b.textContent = w;
+      b.onclick = () => answer(w);
+      return b;
+    }));
+  }
+}
+
+function answer(given) {
+  const q = quiz.questions[quiz.i];
+  const ok = norm(given) === norm(q.a);
+  if (ok) quiz.right++; else quiz.wrong.push(quiz.list.items.find((it) => it.a === q.q || it.b === q.q));
+  $("quiz-feedback").textContent = ok ? "Richtig!" : `Falsch. Richtig: ${q.a}`;
+  $("quiz-feedback").className = "quiz-fb " + (ok ? "ok" : "bad");
+  for (const b of $("quiz-options").children) { b.disabled = true; if (norm(b.textContent) === norm(q.a)) b.classList.add("right"); }
+  $("quiz-input").disabled = true; $("quiz-check").disabled = true;
+  $("quiz-next").hidden = false;
+  $("quiz-next").textContent = quiz.i + 1 < quiz.questions.length ? "Weiter" : "Ergebnis";
+  $("quiz-next").focus();
+}
+
+$("quiz-check").onclick = () => { if ($("quiz-input").value.trim()) answer($("quiz-input").value); };
+$("quiz-input").onkeydown = (e) => { if (e.key === "Enter") $("quiz-check").click(); };
+$("quiz-next").onclick = () => {
+  if (quiz.i + 1 < quiz.questions.length) { quiz.i++; showQuestion(); return; }
+  const total = quiz.questions.length;
+  $("quiz-progress").textContent = "Fertig";
+  $("quiz-question").textContent = `${quiz.right} von ${total} richtig`;
+  $("quiz-options").hidden = true; $("quiz-typed").hidden = true;
+  $("quiz-feedback").className = "quiz-fb";
+  $("quiz-feedback").textContent = quiz.wrong.length ? "Noch nicht sicher: " + quiz.wrong.map((w) => `${w.a} = ${w.b}`).join(", ") : "Alles richtig, super!";
+  if (quiz.wrong.length) {
+    $("quiz-next").textContent = "Fehler wiederholen";
+    $("quiz-next").onclick = () => { const l = quiz.list, w = quiz.wrong; $("quiz-next").onclick = nextHandler; startQuiz(l, w); };
+  } else { $("quiz-next").hidden = true; }
+  if (quiz.wrong.length) $("quiz-next").hidden = false;
+};
+const nextHandler = $("quiz-next").onclick;
+$("quiz-stop").onclick = () => { quiz = null; $("quiz").hidden = true; $("learn-home").hidden = false; $("quiz-next").onclick = nextHandler; };
 
 // --- Gespräch über zwei Handys (Raum-Code, Abfrage alle 2 s) ---
 const cid = store.get("cid") || (() => { const v = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, ""); store.set("cid", v); return v; })();

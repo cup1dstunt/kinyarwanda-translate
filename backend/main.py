@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import cache, currency, ocr, rooms, tts, users
+from . import cache, currency, lists, ocr, rooms, tts, users
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -26,6 +26,18 @@ def require_admin(user: users.User = Depends(require_password)) -> users.User:
 
 class NewUser(BaseModel):
     name: str
+
+
+class VocabItem(BaseModel):
+    a: str
+    b: str = ""  # leer = automatisch übersetzen
+
+
+class NewList(BaseModel):
+    title: str
+    source: str
+    target: str
+    items: list[VocabItem]
 
 
 class RoomJoin(BaseModel):
@@ -151,6 +163,43 @@ def convert(req: ConvertRequest):
         return currency.convert(req.amount, req.source, req.target)
     except currency.CurrencyError as exc:
         raise HTTPException(502, str(exc))
+
+
+@app.get("/api/lists", dependencies=[Depends(require_password)])
+def lists_get():
+    return {"lists": lists.all_lists()}
+
+
+@app.post("/api/lists")
+def lists_add(req: NewList, user: users.User = Depends(require_password)):
+    if not req.title.strip():
+        raise HTTPException(400, "Titel fehlt")
+    if req.source not in LANGUAGES or req.target not in LANGUAGES or req.source == req.target:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    entries = [(i.a.strip(), i.b.strip()) for i in req.items if i.a.strip()]
+    if not entries or len(entries) > lists.MAX_ITEMS:
+        raise HTTPException(400, f"1 bis {lists.MAX_ITEMS} Einträge nötig")
+    items = []
+    for a, b in entries:
+        if len(a) > 100 or len(b) > 100:
+            raise HTTPException(413, "Einträge max. 100 Zeichen")
+        if not b:
+            b = translate_text(a, req.source, req.target)[0]
+        items.append({"a": a, "b": b})
+    try:
+        return lists.add(user.name, req.title, req.source, req.target, items)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.delete("/api/lists/{list_id}")
+def lists_delete(list_id: str, user: users.User = Depends(require_password)):
+    result = lists.delete(list_id, user.name, user.admin)
+    if result is None:
+        raise HTTPException(403, "Nur Besitzer oder Admin dürfen löschen")
+    if result is False:
+        raise HTTPException(404, "Liste nicht gefunden")
+    return {"ok": True}
 
 
 def _room_call(fn, *args):
