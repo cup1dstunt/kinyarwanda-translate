@@ -48,6 +48,8 @@ function showTab(name) {
   }
   if (name === "favs") renderFavs();
   if (name === "phrases") loadPhrases();
+  if (name === "chat" && room && !$("chat-room").hidden) startPolling();
+  if (name !== "chat") stopPolling();
   setStatus("");
 }
 
@@ -65,6 +67,9 @@ async function init() {
     $("admin").hidden = !(info.me && info.me.admin);
     $("ocr-btn").hidden = !info.ocr;
     $("price-btn").hidden = !info.ocr;
+    fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
+    $("room-lang").value = store.get("room-lang") || "de";
+    resumeRoom();
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
     fill($("conv-b"), info.languages, (l) => LANG_LABELS[l]);
     $("conv-a").value = "de"; $("conv-b").value = "rw";
@@ -584,6 +589,113 @@ function addBubble(from, to, text, translation, side) {
   div.scrollIntoView({ behavior: "smooth", block: "end" });
 }
 $("chat-clear").onclick = () => $("chat-log").replaceChildren();
+
+// --- Gespräch über zwei Handys (Raum-Code, Abfrage alle 2 s) ---
+const cid = store.get("cid") || (() => { const v = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, ""); store.set("cid", v); return v; })();
+let room = null, lastId = 0, pollTimer = null;
+
+function setMode(mode) {
+  $("chat-local").hidden = mode !== "local";
+  $("chat-room").hidden = mode !== "room";
+  $("mode-local").classList.toggle("active", mode === "local");
+  $("mode-room").classList.toggle("active", mode === "room");
+  if (mode === "room" && room) startPolling(); else stopPolling();
+}
+$("mode-local").onclick = () => setMode("local");
+$("mode-room").onclick = () => setMode("room");
+
+function stopPolling() { clearInterval(pollTimer); pollTimer = null; }
+function startPolling() { stopPolling(); if ($("chat").hidden) return; poll(); pollTimer = setInterval(poll, 2000); }
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopPolling(); else if (room && !$("chat-room").hidden) startPolling();
+});
+
+function showRoom() {
+  $("room-join").hidden = !!room;
+  $("room-live").hidden = !room;
+  if (room) $("room-title").textContent = room;
+}
+
+async function enterRoom(code) {
+  const lang = $("room-lang").value;
+  store.set("room-lang", lang);
+  try {
+    const r = await api("/api/rooms", { cid, lang, code: code || null });
+    room = r.room; lastId = 0;
+    store.set("room", JSON.stringify({ room, lang }));
+    $("room-log").replaceChildren();
+    showRoom(); startPolling(); setStatus("");
+  } catch (e) { setStatus(e.message); }
+}
+$("room-create").onclick = () => enterRoom("");
+$("room-enter").onclick = () => { const c = $("room-code").value.trim(); if (c) enterRoom(c); };
+
+function resumeRoom() {
+  let saved = null;
+  try { saved = JSON.parse(store.get("room") || "null"); } catch { /* ignorieren */ }
+  if (!saved || room) return;
+  $("room-lang").value = saved.lang;
+  api("/api/rooms", { cid, lang: saved.lang, code: saved.room }).then((r) => {
+    room = r.room; lastId = 0; showRoom(); setMode("room");
+  }).catch(() => store.del("room"));
+}
+
+async function poll() {
+  if (!room) return;
+  try {
+    const r = await api(`/api/rooms/${room}/messages?cid=${cid}&after=${lastId}`);
+    $("room-members").textContent = r.members.map((m) => `${m.name} (${LANG_LABELS[m.lang]})`).join(", ");
+    for (const m of r.messages) { addRoomBubble(m); lastId = Math.max(lastId, m.id); }
+  } catch (e) {
+    setStatus(e.message);
+    if (/Raum|nicht/.test(e.message)) leaveRoom(false);
+    else { stopPolling(); setTimeout(() => { if (room) startPolling(); }, 10000); } // bei Fehlern nicht im 2-s-Takt wiederholen
+  }
+}
+
+function addRoomBubble(m) {
+  const div = document.createElement("div");
+  div.className = "bubble " + (m.mine ? "b" : "a");
+  const who = document.createElement("small");
+  who.textContent = m.mine ? "Du" : m.name;
+  const big = document.createElement("div");
+  big.className = "big-text";
+  big.textContent = m.text;
+  div.append(who, big);
+  if (!m.mine && m.original !== m.text) {
+    const orig = document.createElement("small");
+    orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
+    div.append(orig);
+  }
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  const lang = $("room-lang").value;
+  row.append(
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(m.text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(m.text)),
+  );
+  div.append(row);
+  $("room-log").append(div);
+  div.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+$("room-send").onclick = async () => {
+  const text = $("room-text").value.trim();
+  if (!text || !room) return;
+  $("room-send").disabled = true;
+  try {
+    await api(`/api/rooms/${room}/messages`, { cid, text });
+    $("room-text").value = "";
+    await poll();
+  } catch (e) { setStatus(e.message); }
+  $("room-send").disabled = false;
+};
+
+function leaveRoom(notify = true) {
+  if (notify && room) fetch(`/api/rooms/${room}?cid=${cid}`, { method: "DELETE", headers: { "X-App-Password": password } }).catch(() => {});
+  room = null; stopPolling(); store.del("room"); showRoom();
+}
+$("room-leave").onclick = () => leaveRoom();
 
 // --- Preisschild: Foto → Beträge → Euro ---
 function parsePrices(text) {

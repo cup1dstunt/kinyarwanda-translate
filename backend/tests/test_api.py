@@ -184,3 +184,34 @@ def test_translation_cache(web, monkeypatch):
     second = web.post("/api/translate", headers=H, json=body).json()
     assert first["translation"] == second["translation"] == "Muraho"
     assert second["cached"] is True and calls == ["Hallo"]
+
+
+def test_room_chat_translates_per_reader(web, monkeypatch):
+    calls = []
+
+    class Fake:
+        def translate(self, text, source, target):
+            calls.append((text, target))
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    a, b = "a" * 12, "b" * 12
+    code = web.post("/api/rooms", headers=H, json={"cid": a, "lang": "de"}).json()["room"]
+    assert web.post("/api/rooms", headers=H, json={"cid": b, "lang": "rw", "code": code.lower()}).status_code == 200
+    assert web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "Hallo"}).status_code == 200
+    got = web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H).json()
+    assert got["messages"][0]["text"] == "[rw] Hallo" and got["messages"][0]["original"] == "Hallo"
+    mine = web.get(f"/api/rooms/{code}/messages", params={"cid": a}, headers=H).json()["messages"][0]
+    assert mine["mine"] is True and mine["text"] == "Hallo"
+    web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H)
+    assert calls == [("Hallo", "rw")]  # nur einmal übersetzt
+    later = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()
+    assert later["messages"] == [] and len(later["members"]) == 2
+
+
+def test_room_errors(web):
+    assert web.post("/api/rooms", headers=H, json={"cid": "c" * 12, "lang": "de", "code": "NOPE1"}).status_code == 404
+    assert web.post("/api/rooms", json={"cid": "c" * 12, "lang": "de"}).status_code == 401
+    code = web.post("/api/rooms", headers=H, json={"cid": "a" * 12, "lang": "de"}).json()["room"]
+    r = web.get(f"/api/rooms/{code}/messages", params={"cid": "z" * 12}, headers=H)
+    assert r.status_code == 404

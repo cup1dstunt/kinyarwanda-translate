@@ -92,6 +92,11 @@
     </section>
 
     <section id="chat" class="view" hidden>
+      <div class="seg" role="group" aria-label="Modus">
+        <button id="mode-local" class="active">Ein Gerät</button>
+        <button id="mode-room">Zwei Handys</button>
+      </div>
+      <div id="chat-local" class="view">
       <div class="langbar">
         <select id="conv-a" aria-label="Ich spreche"></select>
         <button id="conv-swap" class="icon round" title="Sprachen tauschen" aria-label="Sprachen tauschen"><svg><use href="#i-swap"/></svg></button>
@@ -108,6 +113,28 @@
           <button id="chat-clear" class="ghost">Gespräch leeren</button>
           <span class="spacer"></span>
           <button id="chat-go" class="primary">Senden</button>
+        </div>
+      </div>
+    </div>
+
+      <div id="chat-room" class="view" hidden>
+        <div id="room-join" class="card cur">
+          <label for="room-lang"><small>Ich schreibe auf</small></label>
+          <select id="room-lang"></select>
+          <button id="room-create" class="primary big">Neuen Raum erstellen</button>
+          <input id="room-code" type="text" placeholder="Raum-Code eingeben" autocapitalize="characters" autocomplete="off" maxlength="5" aria-label="Raum-Code">
+          <button id="room-enter" class="primary">Beitreten</button>
+        </div>
+        <div id="room-live" hidden>
+          <div class="card room-head">
+            <div><small>Raum-Code (weitergeben)</small><div id="room-title" class="room-code"></div><small id="room-members"></small></div>
+            <button id="room-leave" class="ghost">Verlassen</button>
+          </div>
+          <div id="room-log" class="chat-log" aria-live="polite"></div>
+          <div class="card chat-input">
+            <textarea id="room-text" placeholder="Nachricht eingeben oder diktieren" maxlength="2000" aria-label="Nachricht"></textarea>
+            <div class="pane-actions"><span class="spacer"></span><button id="room-send" class="primary">Senden</button></div>
+          </div>
         </div>
       </div>
     </section>
