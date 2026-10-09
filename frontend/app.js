@@ -512,11 +512,15 @@ $("rate-clear").onclick = () => {
 
 // --- Phrasenbuch: fertige Sätze, Kinyarwanda ungeprüft bis zur Bestätigung ---
 let phrases = null;
+const fold = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{}"); } catch { return {}; } };
 
 async function loadPhrases() {
   if (!phrases) {
-    try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
+    try {
+      const [base, more] = await Promise.all([fetch("/phrases.json"), fetch("/dictionary.json")]);
+      phrases = [...await base.json(), ...await more.json()];
+    } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
     const targets = UI_LANGS.filter((l) => l !== uiLang);
     fill($("ph-lang"), targets, (l) => "→ " + LANG_LABELS[l]);
     $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
@@ -536,7 +540,14 @@ function renderPhrases() {
   if (!phrases) return;
   const lang = $("ph-lang").value, rev = reviews();
   $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
-  $("ph-list").replaceChildren(...[...phrases, ...myPhrases].filter((p) => p.c === $("ph-cat").value).map((p) => {
+  const q = fold($("ph-search").value);
+  const all = [...phrases, ...myPhrases];
+  // Suche: alle Kategorien und alle Sprachen, höchstens 80 Treffer
+  const shown = q
+    ? all.filter((p) => UI_LANGS.some((l) => fold(p[l]).includes(q))).slice(0, 80)
+    : all.filter((p) => p.c === $("ph-cat").value);
+  $("ph-cat").hidden = !!q;
+  $("ph-list").replaceChildren(...shown.map((p) => {
     const key = p.de + "|" + lang;
     const r = rev[key];
     const text = r && r.text ? r.text : p[lang];
@@ -544,7 +555,7 @@ function renderPhrases() {
     const card = document.createElement("div");
     card.className = "card fav";
     const meta = document.createElement("small");
-    meta.textContent = lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : "";
+    meta.textContent = [q ? t(p.c) : "", lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : ""].filter(Boolean).join(" · ");
     const de = document.createElement("div");
     de.textContent = p[uiLang];
     const out = document.createElement("strong");
@@ -610,6 +621,7 @@ $("ph-add").onclick = async () => {
   $("ph-add").disabled = false;
 };
 $("ph-cat").onchange = $("ph-lang").onchange = renderPhrases;
+$("ph-search").oninput = renderPhrases;
 
 // --- Gesprächsmodus: zwei Sprachen, abwechselnd ---
 let who = "a";

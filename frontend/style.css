@@ -212,6 +212,8 @@ footer { text-align: center; }
 /* iOS-Tastatur: Tab-Leiste weg, solange ein Feld fokussiert ist */
 body.typing .tabbar { display: none; }
 
+.search { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; min-height: 46px; margin-bottom: 8px; }
+
 .people { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 0; }
 .people legend { color: var(--muted); font-size: .9rem; padding: 0 4px; }
 .people label { display: flex; gap: 10px; align-items: center; min-height: 40px; }
