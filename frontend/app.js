@@ -619,49 +619,109 @@ function setLearnMode(mode) {
 $("ph-mode-phrases").onclick = () => setLearnMode("phrases");
 $("ph-mode-learn").onclick = () => setLearnMode("learn");
 
+let learnData = { lists: [], categories: [] };
+let learnOwn = "all"; // all | mine | others
+
+for (const [key, id] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) {
+  $(id).onclick = () => {
+    learnOwn = key;
+    for (const [k, i] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) $(i).classList.toggle("active", k === key);
+    renderLists();
+  };
+}
+$("learn-cat-filter").onchange = renderLists;
+
+function addWordsForm(l) {
+  const box = document.createElement("div");
+  box.className = "learn-form";
+  box.hidden = true;
+  const ta = document.createElement("textarea");
+  ta.placeholder = t("Eine Zeile pro Wort, z. B. Wasser = amazi");
+  const ok = document.createElement("button");
+  ok.className = "primary"; ok.textContent = t("Hinzufügen");
+  ok.onclick = async () => {
+    const items = parseWordLines(ta.value);
+    if (!items.length) { setStatus("Bereits vorhanden oder leer."); return; }
+    ok.disabled = true;
+    setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
+    try {
+      await api(`/api/lists/${l.id}/items`, { items });
+      setStatus("");
+      loadLists();
+    } catch (e) { setStatus(e.message); }
+    ok.disabled = false;
+  };
+  box.append(ta, ok);
+  return box;
+}
+
+function renderLists() {
+  const cat = $("learn-cat-filter").value;
+  const shown = learnData.lists.filter((l) => (learnOwn === "all" || (learnOwn === "mine") === (l.owner === myName))
+    && (!cat || (l.category || "Sonstiges") === cat));
+  $("learn-empty").textContent = t(learnData.lists.length ? "Keine Listen in dieser Auswahl." : "Noch keine Listen. Lege unten die erste an.");
+  $("learn-empty").hidden = shown.length > 0;
+  $("learn-lists").replaceChildren(...shown.map((l) => {
+    const card = document.createElement("div");
+    card.className = "card fav";
+    const meta = document.createElement("small");
+    meta.textContent = `${t("Von {0}", l.owner)} · ${t(l.category || "Sonstiges")} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
+    const title = document.createElement("strong");
+    title.textContent = l.title;
+    const row = document.createElement("div");
+    row.className = "fav-actions learn-actions";
+    const start = document.createElement("button");
+    start.className = "primary"; start.textContent = t("Test starten");
+    start.onclick = () => startQuiz(l);
+    row.append(start);
+    card.append(meta, title, row);
+    if (myAdmin || l.owner === myName) {
+      const form = addWordsForm(l);
+      row.append(mkBtn("#i-plus", "Wörter hinzufügen", () => { form.hidden = !form.hidden; }));
+      row.append(mkBtn("#i-trash", "Liste löschen", async () => {
+        if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
+        try {
+          const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+        } catch (e) { setStatus(e.message); }
+        loadLists();
+      }));
+      card.append(form);
+    }
+    return card;
+  }));
+}
+
 async function loadLists() {
   try {
-    const r = await api("/api/lists");
-    $("learn-empty").hidden = r.lists.length > 0;
-    $("learn-lists").replaceChildren(...r.lists.map((l) => {
-      const card = document.createElement("div");
-      card.className = "card fav";
-      const meta = document.createElement("small");
-      meta.textContent = `${l.owner} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
-      const title = document.createElement("strong");
-      title.textContent = l.title;
-      const row = document.createElement("div");
-      row.className = "fav-actions learn-actions";
-      const start = document.createElement("button");
-      start.className = "primary"; start.textContent = t("Üben");
-      start.onclick = () => startQuiz(l);
-      row.append(start);
-      if (myAdmin || l.owner === myName) {
-        row.append(mkBtn("#i-trash", "Liste löschen", async () => {
-          if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
-          try {
-            const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
-            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
-          } catch (e) { setStatus(e.message); }
-          loadLists();
-        }));
-      }
-      card.append(meta, title, row);
-      return card;
-    }));
+    learnData = await api("/api/lists");
+    const fill2 = (sel, first) => {
+      const keep = sel.value;
+      sel.replaceChildren(...[...(first ? [["", t("Alle Kategorien")]] : []), ...learnData.categories.map((c) => [c, t(c)])].map(([v, label]) => {
+        const o = document.createElement("option"); o.value = v; o.textContent = label; return o;
+      }));
+      if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    };
+    fill2($("learn-cat-filter"), true);
+    fill2($("learn-cat"), false);
+    renderLists();
   } catch (e) { setStatus(e.message); }
 }
 
-$("learn-save").onclick = async () => {
-  const items = $("learn-items").value.split("\n").map((line) => {
+function parseWordLines(text) {
+  return text.split("\n").map((line) => {
     const [a, ...rest] = line.split("=");
     return { a: a.trim(), b: rest.join("=").trim() };
   }).filter((i) => i.a);
+}
+
+$("learn-save").onclick = async () => {
+  const items = parseWordLines($("learn-items").value);
   if (!$("learn-title").value.trim() || !items.length) { setStatus("Titel und mindestens ein Wort nötig."); return; }
   $("learn-save").disabled = true;
   setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
   try {
-    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, items });
+    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, category: $("learn-cat").value, items });
     $("learn-title").value = ""; $("learn-items").value = "";
     $("learn-new").open = false;
     setStatus("");

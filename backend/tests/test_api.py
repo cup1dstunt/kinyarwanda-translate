@@ -230,9 +230,20 @@ def test_vocab_lists(web, monkeypatch):
     code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
     ha = {"X-App-Password": code}
     assert web.get("/api/lists", headers=ha).json()["lists"][0]["owner"] == "Admin"
+    assert web.get("/api/lists", headers=ha).json()["categories"][-1] == "Sonstiges"
+    assert made["category"] == "Sonstiges"
+    # Wörter ergänzen: nur Besitzer/Admin, Doppelte werden übersprungen, fehlende Übersetzung automatisch
+    more = {"items": [{"a": "wasser", "b": "x"}, {"a": "Milch"}]}
+    assert web.post(f"/api/lists/{made['id']}/items", headers=ha, json=more).status_code == 403
+    grown = web.post(f"/api/lists/{made['id']}/items", headers=H, json=more).json()
+    assert [i["a"] for i in grown["items"]] == ["Wasser", "Brot", "Milch"]
+    assert grown["items"][2]["b"] == "[rw] Milch"
+    assert web.post("/api/lists/nope/items", headers=H, json=more).status_code == 404
     assert web.delete(f"/api/lists/{made['id']}", headers=ha).status_code == 403  # fremde Liste
     assert web.post("/api/lists", headers=ha, json={**body, "title": ""}).status_code == 400
-    mine = web.post("/api/lists", headers=ha, json=body).json()
+    mine = web.post("/api/lists", headers=ha, json={**body, "category": "Essen & Einkaufen"}).json()
+    assert mine["category"] == "Essen & Einkaufen"
+    assert web.post("/api/lists", headers=ha, json={**body, "category": "Unsinn"}).json()["category"] == "Sonstiges"
     assert web.delete(f"/api/lists/{mine['id']}", headers=ha).status_code == 200
     assert web.delete(f"/api/lists/{made['id']}", headers=H).status_code == 200
     assert web.delete("/api/lists/nope", headers=H).status_code == 404
