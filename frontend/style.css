@@ -211,3 +211,5 @@ footer { text-align: center; }
 
 /* iOS-Tastatur: Tab-Leiste weg, solange ein Feld fokussiert ist */
 body.typing .tabbar { display: none; }
+
+.search { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; min-height: 46px; margin-bottom: 8px; }

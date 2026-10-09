@@ -154,8 +154,14 @@ def test_provider_error_shows_google_message():
 def test_phrasebook_complete(web):
     phrases = web.get("/phrases.json").json()
     assert {p["c"] for p in phrases} >= {"Alltagssprache", "Arzt", "Behörde", "Einkaufen"}
-    for p in phrases:
+    dictionary = web.get("/dictionary.json").json()
+    assert len(dictionary) > 200
+    for p in phrases + dictionary:
         assert all(p.get(k, "").strip() for k in ("de", "fr", "en", "rw")), p
+    de = [p["de"] for p in phrases + dictionary]
+    assert len(de) == len(set(de))  # keine doppelten deutschen Einträge
+    entries = _i18n_entries()
+    assert [c for c in {p["c"] for p in phrases + dictionary} if c not in entries] == []
 
 
 def test_access_codes(web):
