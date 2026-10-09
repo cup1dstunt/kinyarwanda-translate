@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import cache, currency, lists, ocr, rooms, tts, users
+from . import cache, currency, lists, ocr, rooms, tts, userphrases, users
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -48,6 +48,16 @@ class ShareList(BaseModel):
 
 class MoreItems(BaseModel):
     items: list[VocabItem]
+
+
+class NewPhrase(BaseModel):
+    text: str
+    lang: str
+    category: str = "Eigene"
+
+
+class PhrasesFromList(BaseModel):
+    list_id: str
 
 
 class RoomJoin(BaseModel):
@@ -262,6 +272,61 @@ def lists_delete(list_id: str, user: users.User = Depends(require_password)):
         raise HTTPException(403, "Nur Besitzer oder Admin dürfen löschen")
     if result is False:
         raise HTTPException(404, "Liste nicht gefunden")
+    return {"ok": True}
+
+
+def _full_phrase(texts: dict[str, str], category: str) -> dict:
+    """Ergänzt fehlende Sprachen per Übersetzung (cache-gestützt)."""
+    src = next(iter(texts))
+    out = {"c": category}
+    for lang in LANGUAGES:
+        out[lang] = texts[lang] if lang in texts else translate_text(texts[src], src, lang)[0]
+    return out
+
+
+@app.get("/api/my-phrases")
+def my_phrases(user: users.User = Depends(require_password)):
+    return {"phrases": userphrases.mine(user.name)}
+
+
+@app.post("/api/my-phrases")
+def my_phrases_add(req: NewPhrase, user: users.User = Depends(require_password)):
+    if req.lang not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    text = req.text.strip()
+    if not text or len(text) > 200:
+        raise HTTPException(400, "1 bis 200 Zeichen nötig")
+    phrase = _full_phrase({req.lang: text}, req.category.strip()[:30] or "Eigene")
+    try:
+        added = userphrases.add_many(user.name, [{**phrase, "de": phrase["de"]}])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"added": len(added)}
+
+
+@app.post("/api/my-phrases/from-list")
+def my_phrases_from_list(req: PhrasesFromList, user: users.User = Depends(require_password)):
+    found = next((x for x in lists.visible_lists(user.name) if x["id"] == req.list_id), None)
+    if found is None:
+        raise HTTPException(404, "Liste nicht gefunden")
+    existing = {p["de"].casefold() for p in userphrases.mine(user.name)}
+    entries = []
+    for it in found["items"]:
+        texts = {found["source"]: it["a"], found["target"]: it["b"]}
+        if texts.get("de", "").casefold() in existing:
+            continue
+        entries.append(_full_phrase(texts, "Eigene"))
+    try:
+        added = userphrases.add_many(user.name, entries)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"added": len(added)}
+
+
+@app.delete("/api/my-phrases/{phrase_id}")
+def my_phrases_delete(phrase_id: str, user: users.User = Depends(require_password)):
+    if not userphrases.delete(user.name, phrase_id):
+        raise HTTPException(404, "Phrase nicht gefunden")
     return {"ok": True}
 
 

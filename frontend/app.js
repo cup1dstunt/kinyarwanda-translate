@@ -517,27 +517,34 @@ const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{
 async function loadPhrases() {
   if (!phrases) {
     try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
-    const cats = [...new Set(phrases.map((p) => p.c))];
-    fill($("ph-cat"), cats, (c) => t(c));
     const targets = UI_LANGS.filter((l) => l !== uiLang);
     fill($("ph-lang"), targets, (l) => "→ " + LANG_LABELS[l]);
     $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
   }
+  try { myPhrases = (await api("/api/my-phrases")).phrases.map((p) => ({ ...p, own: true })); } catch { myPhrases = []; }
+  const cats = [...new Set([...phrases.map((p) => p.c), ...myPhrases.map((p) => p.c)])];
+  const keep = $("ph-cat").value;
+  fill($("ph-cat"), cats, (c) => t(c));
+  if (cats.includes(keep)) $("ph-cat").value = keep;
+  fill($("ph-add-cat"), [...new Set([...cats, "Eigene"])], (c) => t(c));
   renderPhrases();
 }
+
+let myPhrases = [];
 
 function renderPhrases() {
   if (!phrases) return;
   const lang = $("ph-lang").value, rev = reviews();
   $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
-  $("ph-list").replaceChildren(...phrases.filter((p) => p.c === $("ph-cat").value).map((p) => {
+  $("ph-list").replaceChildren(...[...phrases, ...myPhrases].filter((p) => p.c === $("ph-cat").value).map((p) => {
     const key = p.de + "|" + lang;
     const r = rev[key];
     const text = r && r.text ? r.text : p[lang];
+    const verified = lang === "rw" && (p.v || r);
     const card = document.createElement("div");
     card.className = "card fav";
     const meta = document.createElement("small");
-    meta.textContent = lang === "rw" ? t(r ? "✓ geprüft" : "ungeprüft") : "";
+    meta.textContent = lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : "";
     const de = document.createElement("div");
     de.textContent = p[uiLang];
     const out = document.createElement("strong");
@@ -555,7 +562,19 @@ function renderPhrases() {
       mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
       mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
     );
-    if (lang === "rw") {
+    if (p.own) {
+      row.append(mkBtn("#i-trash", "Phrase löschen", async () => {
+        if (!window.confirm(t("Phrase „{0}“ löschen?", p[uiLang]))) return;
+        try {
+          const res = await fetch("/api/my-phrases/" + p.id, { method: "DELETE", headers: { "X-App-Password": password } });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+        } catch (e) { setStatus(e.message); }
+        loadPhrases();
+      }));
+    } else if (lang === "rw" && !verified) {
+      // Bewertung nur noch für noch ungeprüfte Sätze, klein hinter einem Knopf
+      const pair = document.createElement("span");
+      pair.hidden = true;
       const up = document.createElement("button");
       up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
       up.onclick = () => review(true, "");
@@ -565,12 +584,31 @@ function renderPhrases() {
         const fix = window.prompt(t("Richtige Übersetzung:"), text);
         if (fix !== null && fix.trim()) review(false, fix.trim());
       };
-      row.append(up, down);
+      pair.append(up, down);
+      const more = document.createElement("button");
+      more.className = "icon"; more.textContent = "⋯"; more.title = t("Prüfen"); more.setAttribute("aria-label", t("Prüfen"));
+      more.onclick = () => { pair.hidden = !pair.hidden; };
+      row.append(more, pair);
     }
     card.append(...(meta.textContent ? [meta] : []), de, out, row);
     return card;
   }));
 }
+$("ph-add").onclick = async () => {
+  const text = $("ph-add-text").value.trim();
+  if (!text) return;
+  $("ph-add").disabled = true;
+  setStatus("Übersetze …");
+  try {
+    await api("/api/my-phrases", { text, lang: uiLang, category: $("ph-add-cat").value });
+    $("ph-add-text").value = "";
+    $("ph-add-box").open = false;
+    setStatus("");
+    await loadPhrases();
+    $("ph-cat").value = $("ph-add-cat").value; renderPhrases();
+  } catch (e) { setStatus(e.message); }
+  $("ph-add").disabled = false;
+};
 $("ph-cat").onchange = $("ph-lang").onchange = renderPhrases;
 
 // --- Gesprächsmodus: zwei Sprachen, abwechselnd ---
@@ -744,6 +782,13 @@ function renderLists() {
     if (myAdmin || mine) {
       const form = addWordsForm(l);
       row.append(mkBtn("#i-plus", "Wörter hinzufügen", () => { form.hidden = !form.hidden; }));
+      row.append(mkBtn("#i-book", "In meine Phrasen übernehmen", async () => {
+        setStatus("Übersetze …");
+        try {
+          const r = await api("/api/my-phrases/from-list", { list_id: l.id });
+          setStatus(t("{0} Phrasen übernommen.", r.added));
+        } catch (e) { setStatus(e.message); }
+      }));
       row.append(mkBtn("#i-trash", "Liste löschen", async () => {
         if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
         try {
