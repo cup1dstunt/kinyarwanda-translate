@@ -642,6 +642,18 @@ $("ph-mode-phrases").onclick = () => setLearnMode("phrases");
 $("ph-mode-learn").onclick = () => setLearnMode("learn");
 
 let learnData = { lists: [], categories: [] };
+let people = [];
+
+function peoplePicker(box, preselected = []) {
+  box.replaceChildren(...(people.length ? people.map((n) => {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = n; cb.checked = preselected.includes(n);
+    label.append(cb, document.createTextNode(n));
+    return label;
+  }) : [Object.assign(document.createElement("small"), { textContent: t("Noch keine anderen Personen angelegt.") })]));
+}
+const pickedPeople = (box) => [...box.querySelectorAll("input:checked")].map((c) => c.value);
 let learnOwn = "all"; // all | mine | others
 
 for (const [key, id] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) {
@@ -687,7 +699,8 @@ function renderLists() {
     const card = document.createElement("div");
     card.className = "card fav";
     const meta = document.createElement("small");
-    meta.textContent = `${t("Von {0}", l.owner)} · ${t(l.category || "Sonstiges")} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
+    const mine = l.owner === myName;
+    meta.textContent = `${mine ? (l.to && l.to.length ? t("An: {0}", l.to.join(", ")) : t("Meine")) : t("Von {0}", l.owner)} · ${t(l.category || "Sonstiges")} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
     const title = document.createElement("strong");
     title.textContent = l.title;
     const row = document.createElement("div");
@@ -695,9 +708,40 @@ function renderLists() {
     const start = document.createElement("button");
     start.className = "primary"; start.textContent = t("Test starten");
     start.onclick = () => startQuiz(l);
-    row.append(start);
+    row.append(mkBtn("#i-book", "Lernen mit Karten", () => startCards(l)), start);
     card.append(meta, title, row);
-    if (myAdmin || l.owner === myName) {
+    if (!mine && l.to && l.to.includes(myName)) {
+      row.append(mkBtn("#i-trash", "Liste aus meiner Ansicht entfernen", async () => {
+        if (!window.confirm(t("Liste „{0}“ entfernen?", l.title))) return;
+        try { await api(`/api/lists/${l.id}/leave`, {}); } catch (e) { setStatus(e.message); }
+        loadLists();
+      }));
+    }
+    if (myAdmin || mine) {
+      const sendBox = document.createElement("div");
+      sendBox.className = "learn-form"; sendBox.hidden = true;
+      const picker = document.createElement("fieldset");
+      picker.className = "people";
+      const pk = document.createElement("div");
+      picker.append(Object.assign(document.createElement("legend"), { textContent: t("Senden an") }), pk);
+      const go = document.createElement("button");
+      go.className = "primary"; go.textContent = t("Senden");
+      go.onclick = async () => {
+        const names = pickedPeople(pk);
+        if (!names.length) return;
+        go.disabled = true;
+        try {
+          await api(`/api/lists/${l.id}/share`, { to: names });
+          setStatus(t("Gesendet an {0}.", names.join(", ")));
+          loadLists();
+        } catch (e) { setStatus(e.message); }
+        go.disabled = false;
+      };
+      sendBox.append(picker, go);
+      row.append(mkBtn("#i-chat", "Liste senden", () => { peoplePicker(pk, l.to || []); sendBox.hidden = !sendBox.hidden; }));
+      card.append(sendBox);
+    }
+    if (myAdmin || mine) {
       const form = addWordsForm(l);
       row.append(mkBtn("#i-plus", "Wörter hinzufügen", () => { form.hidden = !form.hidden; }));
       row.append(mkBtn("#i-trash", "Liste löschen", async () => {
@@ -717,6 +761,8 @@ function renderLists() {
 async function loadLists() {
   try {
     learnData = await api("/api/lists");
+    try { people = (await api("/api/people")).people; } catch { people = []; }
+    peoplePicker($("learn-to"), pickedPeople($("learn-to")));
     const fill2 = (sel, first) => {
       const keep = sel.value;
       sel.replaceChildren(...[...(first ? [["", t("Alle Kategorien")]] : []), ...learnData.categories.map((c) => [c, t(c)])].map(([v, label]) => {
@@ -743,7 +789,7 @@ $("learn-save").onclick = async () => {
   $("learn-save").disabled = true;
   setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
   try {
-    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, category: $("learn-cat").value, items });
+    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, category: $("learn-cat").value, to: pickedPeople($("learn-to")), items });
     $("learn-title").value = ""; $("learn-items").value = "";
     $("learn-new").open = false;
     setStatus("");
@@ -753,6 +799,40 @@ $("learn-save").onclick = async () => {
 };
 
 const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+// --- Lernkarten: Wort anzeigen, umdrehen, „gewusst“ oder „nochmal“ ---
+let deck = null;
+
+function startCards(list) {
+  deck = { list, queue: shuffle(list.items.map((it) => ({ front: it.a, back: it.b }))), total: list.items.length, known: 0, flipped: false };
+  $("learn-home").hidden = true;
+  $("cards").hidden = false;
+  showCard();
+}
+
+function showCard() {
+  if (!deck.queue.length) {
+    $("cards-progress").textContent = t("Fertig");
+    $("cards-face").textContent = t("Alle Karten gelernt, super!");
+    $("cards-face").disabled = true; $("cards-hint").hidden = true; $("cards-answers").hidden = true;
+    return;
+  }
+  const c = deck.queue[0];
+  deck.flipped = false;
+  $("cards-progress").textContent = `${deck.known} / ${deck.total}`;
+  $("cards-face").textContent = c.front;
+  $("cards-face").disabled = false; $("cards-hint").hidden = false; $("cards-answers").hidden = true;
+}
+
+$("cards-face").onclick = () => {
+  const c = deck.queue[0];
+  deck.flipped = !deck.flipped;
+  $("cards-face").textContent = deck.flipped ? c.back : c.front;
+  $("cards-hint").hidden = deck.flipped; $("cards-answers").hidden = !deck.flipped;
+};
+$("cards-known").onclick = () => { deck.queue.shift(); deck.known++; showCard(); };
+$("cards-again").onclick = () => { deck.queue.push(deck.queue.shift()); showCard(); };
+$("cards-stop").onclick = () => { $("cards").hidden = true; $("learn-home").hidden = false; };
+
 let quiz = null;
 
 function shuffle(a) {

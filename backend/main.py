@@ -39,6 +39,11 @@ class NewList(BaseModel):
     target: str
     items: list[VocabItem]
     category: str = "Sonstiges"
+    to: list[str] = []
+
+
+class ShareList(BaseModel):
+    to: list[str]
 
 
 class MoreItems(BaseModel):
@@ -171,8 +176,39 @@ def convert(req: ConvertRequest):
 
 
 @app.get("/api/lists", dependencies=[Depends(require_password)])
-def lists_get():
-    return {"lists": lists.all_lists(), "categories": lists.CATEGORIES}
+def lists_get(user: users.User = Depends(require_password)):
+    return {"lists": lists.visible_lists(user.name), "categories": lists.CATEGORIES}
+
+
+def _known_recipients(names: list[str], me: str) -> list[str]:
+    valid = {u["name"] for u in users.list_users()} | {"Admin"}
+    unknown = [n for n in names if n not in valid]
+    if unknown:
+        raise HTTPException(400, "Unbekannte Person")
+    return [n for n in dict.fromkeys(names) if n != me]
+
+
+@app.get("/api/people")
+def people(user: users.User = Depends(require_password)):
+    names = {u["name"] for u in users.list_users()} | {"Admin"}
+    return {"people": sorted(names - {user.name}, key=str.casefold)}
+
+
+@app.post("/api/lists/{list_id}/share")
+def lists_share(list_id: str, req: ShareList, user: users.User = Depends(require_password)):
+    result = lists.share(list_id, user.name, user.admin, _known_recipients(req.to, user.name))
+    if result is None:
+        raise HTTPException(403, "Nur Besitzer oder Admin dürfen senden")
+    if result is False:
+        raise HTTPException(404, "Liste nicht gefunden")
+    return result
+
+
+@app.post("/api/lists/{list_id}/leave")
+def lists_leave(list_id: str, user: users.User = Depends(require_password)):
+    if not lists.leave(list_id, user.name):
+        raise HTTPException(404, "Liste nicht gefunden")
+    return {"ok": True}
 
 
 def _build_items(raw: list[VocabItem], source: str, target: str) -> list[dict]:
@@ -198,14 +234,14 @@ def lists_add(req: NewList, user: users.User = Depends(require_password)):
     category = req.category if req.category in lists.CATEGORIES else "Sonstiges"
     items = _build_items(req.items, req.source, req.target)
     try:
-        return lists.add(user.name, req.title, req.source, req.target, items, category)
+        return lists.add(user.name, req.title, req.source, req.target, items, category, _known_recipients(req.to, user.name))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
 
 @app.post("/api/lists/{list_id}/items")
 def lists_add_items(list_id: str, req: MoreItems, user: users.User = Depends(require_password)):
-    found = next((x for x in lists.all_lists() if x["id"] == list_id), None)
+    found = next((x for x in lists.visible_lists(user.name) if x["id"] == list_id), None)
     if found is None:
         raise HTTPException(404, "Liste nicht gefunden")
     if not user.admin and found["owner"] != user.name:

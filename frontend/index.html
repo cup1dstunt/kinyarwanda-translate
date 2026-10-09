@@ -174,10 +174,21 @@
                 <select id="learn-tgt" aria-label="Nach"></select>
               </div>
               <select id="learn-cat" aria-label="Kategorie"></select>
+              <fieldset class="people"><legend>Senden an</legend><div id="learn-to"></div></fieldset>
               <textarea id="learn-items" placeholder="Eine Zeile pro Wort:&#10;Wasser = amazi&#10;Brot&#10;(ohne „=“ wird automatisch übersetzt)" aria-label="Wörter"></textarea>
               <button id="learn-save" class="primary">Liste speichern</button>
             </div>
           </details>
+        </div>
+
+        <div id="cards" class="card quiz" hidden>
+          <div class="quiz-top"><small id="cards-progress"></small><button id="cards-stop" class="ghost">Beenden</button></div>
+          <button id="cards-face" class="quiz-q card-face" aria-live="polite"></button>
+          <small id="cards-hint" class="hint">Antippen zum Umdrehen</small>
+          <div id="cards-answers" class="rate" hidden>
+            <button id="cards-again" class="ghost">Nochmal</button>
+            <button id="cards-known" class="primary">Gewusst</button>
+          </div>
         </div>
 
         <div id="quiz" class="card quiz" hidden>
