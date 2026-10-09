@@ -321,11 +321,33 @@ $("cur-swap").onclick = () => {
   $("cur-to").value = f;
 };
 
+// Betrag mit Tausenderpunkt (1.234.567,50). Ein einzelner Punkt mit 1–2 Stellen danach gilt als Dezimalpunkt.
+function parseAmount(str) {
+  let v = str.replace(/[\s']/g, "");
+  if (v.includes(",")) v = v.replace(/\./g, "").replace(",", ".");
+  else if (!/^\d*\.\d{1,2}$/.test(v)) v = v.replace(/\./g, "");
+  return parseFloat(v);
+}
+
+$("amount").oninput = (e) => {
+  const el = e.target;
+  const raw = el.value;
+  const digitsBefore = raw.slice(0, el.selectionStart).replace(/[^\d,]/g, "").length;
+  const [intPart, ...rest] = raw.replace(/[^\d,.]/g, "").replace(/\./g, "").split(",");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const out = rest.length ? grouped + "," + rest.join("").slice(0, 2) : grouped;
+  if (out === raw) return;
+  el.value = out;
+  let pos = 0, seen = 0;
+  while (pos < out.length && seen < digitsBefore) { if (/[\d,]/.test(out[pos])) seen++; pos++; }
+  el.setSelectionRange(pos, pos);
+};
+
 $("cur-go").onclick = async () => {
   setStatus("");
   try {
     const r = await api("/api/convert", {
-      amount: parseFloat($("amount").value), source: $("cur-from").value, target: $("cur-to").value,
+      amount: parseAmount($("amount").value), source: $("cur-from").value, target: $("cur-to").value,
     });
     const fmt = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
     $("cur-result").textContent = `${fmt.format(r.amount)} ${r.from} = ${fmt.format(r.result)} ${r.to}`;
