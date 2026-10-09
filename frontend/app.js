@@ -126,6 +126,15 @@ $("clear").onclick = () => {
   $("input").focus();
 };
 
+// iOS: Mit offener Tastatur springt die Ansicht, wenn die fixierte Tab-Leiste und
+// automatisches Scrollen mitspielen. Tab-Leiste daher während der Eingabe ausblenden.
+const isField = (el) => el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName);
+const typing = () => isField(document.activeElement);
+document.addEventListener("focusin", (e) => { if (isField(e.target)) document.body.classList.add("typing"); });
+document.addEventListener("focusout", () => {
+  setTimeout(() => { if (!typing()) document.body.classList.remove("typing"); }, 50);
+});
+
 // --- Sprachausgabe (nur de/fr) ---
 const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
 
@@ -595,7 +604,7 @@ function addBubble(from, to, text, translation, side) {
   );
   div.append(orig, big, row);
   $("chat-log").append(div);
-  div.scrollIntoView({ behavior: "smooth", block: "end" });
+  if (!typing()) div.scrollIntoView({ block: "nearest" });
 }
 $("chat-clear").onclick = () => $("chat-log").replaceChildren();
 
@@ -822,7 +831,7 @@ function addRoomBubble(m) {
   );
   div.append(row);
   $("room-log").append(div);
-  div.scrollIntoView({ behavior: "smooth", block: "end" });
+  if (!typing()) div.scrollIntoView({ block: "nearest" });
 }
 
 $("room-send").onclick = async () => {
