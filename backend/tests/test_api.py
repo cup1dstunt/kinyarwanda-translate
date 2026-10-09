@@ -318,3 +318,26 @@ def test_i18n_covers_html_and_server_messages():
     messages = re.findall(r'HTTPException\(\d+, "([^"{]+)"\)', main)
     messages += re.findall(r'raise RoomError\("([^"{]+)"\)', (root / "backend" / "rooms.py").read_text(encoding="utf-8"))
     assert [m for m in messages if m not in entries] == []
+
+
+def test_own_phrases(web, monkeypatch):
+    class Fake:
+        def translate(self, text, source, target):
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    r = web.post("/api/my-phrases", headers=H, json={"text": "Guten Appetit", "lang": "de", "category": "Essen"})
+    assert r.json() == {"added": 1}
+    mine = web.get("/api/my-phrases", headers=H).json()["phrases"]
+    assert mine[0]["de"] == "Guten Appetit" and mine[0]["rw"] == "[rw] Guten Appetit" and mine[0]["c"] == "Essen"
+    assert web.post("/api/my-phrases", headers=H, json={"text": "Guten Appetit", "lang": "de"}).json() == {"added": 0}
+    made = web.post("/api/lists", headers=H, json={"title": "T", "source": "de", "target": "rw",
+                                                   "items": [{"a": "Wasser", "b": "amazi"}]}).json()
+    assert web.post("/api/my-phrases/from-list", headers=H, json={"list_id": made["id"]}).json() == {"added": 1}
+    wasser = [p for p in web.get("/api/my-phrases", headers=H).json()["phrases"] if p["de"] == "Wasser"][0]
+    assert wasser["rw"] == "amazi" and wasser["fr"] == "[fr] Wasser"
+    assert web.post("/api/my-phrases/from-list", headers=H, json={"list_id": "nope"}).status_code == 404
+    code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    assert web.get("/api/my-phrases", headers={"X-App-Password": code}).json()["phrases"] == []  # pro Person getrennt
+    assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 200
+    assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 404
