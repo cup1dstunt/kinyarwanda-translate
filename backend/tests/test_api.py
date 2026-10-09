@@ -225,9 +225,9 @@ def test_vocab_lists(web, monkeypatch):
     monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
     body = {"title": "Markt", "source": "de", "target": "rw",
             "items": [{"a": "Wasser", "b": "amazi"}, {"a": "Brot"}, {"a": "  "}]}
-    made = web.post("/api/lists", headers=H, json=body).json()
-    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
     code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    made = web.post("/api/lists", headers=H, json={**body, "to": ["Anna"]}).json()
+    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
     ha = {"X-App-Password": code}
     assert web.get("/api/lists", headers=ha).json()["lists"][0]["owner"] == "Admin"
     assert web.get("/api/lists", headers=ha).json()["categories"][-1] == "Sonstiges"
@@ -319,6 +319,29 @@ def test_i18n_covers_html_and_server_messages():
     messages += re.findall(r'raise RoomError\("([^"{]+)"\)', (root / "backend" / "rooms.py").read_text(encoding="utf-8"))
     assert [m for m in messages if m not in entries] == []
 
+
+def test_send_lists(web):
+    body = {"title": "Markt", "source": "de", "target": "rw", "items": [{"a": "Wasser", "b": "amazi"}]}
+    anna = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    ben = web.post("/api/admin/users", headers=H, json={"name": "Ben"}).json()["code"]
+    ha, hb = {"X-App-Password": anna}, {"X-App-Password": ben}
+    assert web.get("/api/people", headers=ha).json()["people"] == ["Admin", "Ben"]
+    mine = web.post("/api/lists", headers=ha, json={**body, "to": ["Ben", "Anna"]}).json()
+    assert mine["to"] == ["Ben"]  # sich selbst filtert er heraus
+    assert web.post("/api/lists", headers=ha, json={**body, "to": ["Niemand"]}).status_code == 400
+    private = web.post("/api/lists", headers=ha, json=body).json()
+    assert [x["id"] for x in web.get("/api/lists", headers=hb).json()["lists"]] == [mine["id"]]  # nur die gesendete
+    assert web.get("/api/lists", headers=H).json()["lists"] == []  # auch der Admin sieht fremde Listen nicht
+    # Empfänger darf nicht ergänzen, senden oder löschen, aber „entfernen“
+    assert web.post(f"/api/lists/{mine['id']}/items", headers=hb, json={"items": [{"a": "x", "b": "y"}]}).status_code == 403
+    assert web.post(f"/api/lists/{mine['id']}/share", headers=hb, json={"to": ["Admin"]}).status_code == 403
+    assert web.delete(f"/api/lists/{mine['id']}", headers=hb).status_code == 403
+    assert web.post(f"/api/lists/{private['id']}/leave", headers=hb).status_code == 404
+    shared = web.post(f"/api/lists/{private['id']}/share", headers=ha, json={"to": ["Admin"]}).json()
+    assert shared["to"] == ["Admin"]
+    assert len(web.get("/api/lists", headers=H).json()["lists"]) == 1
+    assert web.post(f"/api/lists/{mine['id']}/leave", headers=hb).status_code == 200
+    assert web.get("/api/lists", headers=hb).json()["lists"] == []
 
 def test_own_phrases(web, monkeypatch):
     class Fake:
