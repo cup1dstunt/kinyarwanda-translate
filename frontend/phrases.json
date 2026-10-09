@@ -4,77 +4,88 @@
   "de": "Hallo",
   "fr": "Bonjour / Salut",
   "en": "Hello",
-  "rw": "Muraho"
+  "rw": "Muraho",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Guten Morgen",
   "fr": "Bonjour (le matin)",
   "en": "Good morning",
-  "rw": "Mwaramutse"
+  "rw": "Mwaramutse",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Guten Tag",
   "fr": "Bonjour",
   "en": "Good afternoon",
-  "rw": "Muraho"
+  "rw": "Muraho",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Guten Abend",
   "fr": "Bonsoir",
   "en": "Good evening",
-  "rw": "Mwiriwe"
+  "rw": "Mwiriwe",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Gute Nacht",
   "fr": "Bonne nuit",
   "en": "Good night",
-  "rw": "Murare neza"
+  "rw": "Murare neza",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Wie geht es dir?",
   "fr": "Comment vas-tu ?",
   "en": "How are you?",
-  "rw": "Amakuru?"
+  "rw": "Amakuru?",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Gut, danke",
   "fr": "Bien, merci",
   "en": "Fine, thank you",
-  "rw": "Ni meza, murakoze"
+  "rw": "Ni meza, murakoze",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Ich heiße …",
   "fr": "Je m'appelle …",
   "en": "My name is …",
-  "rw": "Nitwa …"
+  "rw": "Nitwa …",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Ich komme aus Deutschland",
   "fr": "Je viens d'Allemagne",
   "en": "I come from Germany",
-  "rw": "Nkomoka mu Budage"
+  "rw": "Nkomoka mu Budage",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Freut mich, Sie kennenzulernen",
   "fr": "Enchanté de vous rencontrer",
   "en": "Nice to meet you",
-  "rw": "Nishimiye kubabona"
+  "rw": "Nishimiye kubabona",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Danke",
   "fr": "Merci",
   "en": "Thank you",
-  "rw": "Murakoze"
+  "rw": "Murakoze",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
@@ -88,56 +99,64 @@
   "de": "Gern geschehen",
   "fr": "Je vous en prie",
   "en": "You're welcome",
-  "rw": "Nta kibazo"
+  "rw": "Nta kibazo",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Entschuldigung",
   "fr": "Excusez-moi",
   "en": "Excuse me / Sorry",
-  "rw": "Mbabarira"
+  "rw": "Mbabarira",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Ja",
   "fr": "Oui",
   "en": "Yes",
-  "rw": "Yego"
+  "rw": "Yego",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Nein",
   "fr": "Non",
   "en": "No",
-  "rw": "Oya"
+  "rw": "Oya",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Ich verstehe nicht",
   "fr": "Je ne comprends pas",
   "en": "I don't understand",
-  "rw": "Simbyumva"
+  "rw": "Simbyumva",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Können Sie das wiederholen?",
   "fr": "Pouvez-vous répéter ?",
   "en": "Can you repeat that?",
-  "rw": "Mwabisubiramo?"
+  "rw": "Muvuze?",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Sprechen Sie Englisch?",
   "fr": "Parlez-vous anglais ?",
   "en": "Do you speak English?",
-  "rw": "Muvuga Icyongereza?"
+  "rw": "Muvuga Icyongereza?",
+  "v": 1
  },
  {
   "c": "Alltagssprache",
   "de": "Auf Wiedersehen",
   "fr": "Au revoir",
   "en": "Goodbye",
-  "rw": "Murabeho"
+  "rw": "Murabeho",
+  "v": 1
  },
  {
   "c": "Arzt",
@@ -263,56 +282,64 @@
   "de": "Wie viel kostet das?",
   "fr": "Combien ça coûte ?",
   "en": "How much is this?",
-  "rw": "Ibi ni angahe?"
+  "rw": "Ibi ni angahe?",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Das ist zu teuer",
   "fr": "C'est trop cher",
   "en": "That is too expensive",
-  "rw": "Birahenze cyane"
+  "rw": "Birahenze cyane",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Können Sie den Preis senken?",
   "fr": "Pouvez-vous baisser le prix ?",
   "en": "Can you lower the price?",
-  "rw": "Mwagabanya igiciro?"
+  "rw": "Mwagabanya igiciro?",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Ich nehme das",
   "fr": "Je prends ça",
   "en": "I'll take this",
-  "rw": "Ndabifata"
+  "rw": "Ndabifata",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Haben Sie Wechselgeld?",
   "fr": "Avez-vous de la monnaie ?",
   "en": "Do you have change?",
-  "rw": "Mufite chenji?"
+  "rw": "Mufite chenji?",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Ich möchte Wasser",
   "fr": "Je voudrais de l'eau",
   "en": "I would like water",
-  "rw": "Ndashaka amazi"
+  "rw": "Ndashaka amazi",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Ich möchte bezahlen",
   "fr": "Je voudrais payer",
   "en": "I would like to pay",
-  "rw": "Ndashaka kwishyura"
+  "rw": "Ndashaka kwishyura",
+  "v": 1
  },
  {
   "c": "Einkaufen",
   "de": "Kann ich mit Karte zahlen?",
   "fr": "Puis-je payer par carte ?",
   "en": "Can I pay by card?",
-  "rw": "Nshobora kwishyura n'ikarita?"
+  "rw": "Nshobora kwishyura n'ikarita?",
+  "v": 1
  },
  {
   "c": "Unterwegs",
@@ -361,7 +388,8 @@
   "de": "Wie weit ist es?",
   "fr": "C'est à quelle distance ?",
   "en": "How far is it?",
-  "rw": "Ni kure kangana iki?"
+  "rw": "Ni kure hangana iki?",
+  "v": 1
  },
  {
   "c": "Unterwegs",
@@ -369,5 +397,13 @@
   "fr": "Combien coûte le trajet ?",
   "en": "How much is the ride?",
   "rw": "Urugendo ni angahe?"
+ },
+ {
+  "c": "Alltagssprache",
+  "de": "Können Sie mir bitte zehn Bier bringen?",
+  "fr": "Pouvez-vous m'apporter dix bières, s'il vous plaît ?",
+  "en": "Could you please bring me ten beers?",
+  "rw": "Mwanzanira byeri icumi",
+  "v": 1
  }
 ]
