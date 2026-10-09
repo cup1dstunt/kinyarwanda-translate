@@ -38,6 +38,11 @@ class NewList(BaseModel):
     source: str
     target: str
     items: list[VocabItem]
+    category: str = "Sonstiges"
+
+
+class MoreItems(BaseModel):
+    items: list[VocabItem]
 
 
 class RoomJoin(BaseModel):
@@ -167,7 +172,21 @@ def convert(req: ConvertRequest):
 
 @app.get("/api/lists", dependencies=[Depends(require_password)])
 def lists_get():
-    return {"lists": lists.all_lists()}
+    return {"lists": lists.all_lists(), "categories": lists.CATEGORIES}
+
+
+def _build_items(raw: list[VocabItem], source: str, target: str) -> list[dict]:
+    entries = [(i.a.strip(), i.b.strip()) for i in raw if i.a.strip()]
+    if not entries or len(entries) > lists.MAX_ITEMS:
+        raise HTTPException(400, f"1 bis {lists.MAX_ITEMS} Einträge nötig")
+    items = []
+    for a, b in entries:
+        if len(a) > 100 or len(b) > 100:
+            raise HTTPException(413, "Einträge max. 100 Zeichen")
+        if not b:
+            b = translate_text(a, source, target)[0]
+        items.append({"a": a, "b": b})
+    return items
 
 
 @app.post("/api/lists")
@@ -176,18 +195,26 @@ def lists_add(req: NewList, user: users.User = Depends(require_password)):
         raise HTTPException(400, "Titel fehlt")
     if req.source not in LANGUAGES or req.target not in LANGUAGES or req.source == req.target:
         raise HTTPException(400, "Ungültige Sprachwahl")
-    entries = [(i.a.strip(), i.b.strip()) for i in req.items if i.a.strip()]
-    if not entries or len(entries) > lists.MAX_ITEMS:
-        raise HTTPException(400, f"1 bis {lists.MAX_ITEMS} Einträge nötig")
-    items = []
-    for a, b in entries:
-        if len(a) > 100 or len(b) > 100:
-            raise HTTPException(413, "Einträge max. 100 Zeichen")
-        if not b:
-            b = translate_text(a, req.source, req.target)[0]
-        items.append({"a": a, "b": b})
+    category = req.category if req.category in lists.CATEGORIES else "Sonstiges"
+    items = _build_items(req.items, req.source, req.target)
     try:
-        return lists.add(user.name, req.title, req.source, req.target, items)
+        return lists.add(user.name, req.title, req.source, req.target, items, category)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/lists/{list_id}/items")
+def lists_add_items(list_id: str, req: MoreItems, user: users.User = Depends(require_password)):
+    found = next((x for x in lists.all_lists() if x["id"] == list_id), None)
+    if found is None:
+        raise HTTPException(404, "Liste nicht gefunden")
+    if not user.admin and found["owner"] != user.name:
+        raise HTTPException(403, "Nur Besitzer oder Admin dürfen ergänzen")
+    known = {i["a"].casefold() for i in found["items"]}  # Doppelte vorab raus, damit nichts unnötig übersetzt wird
+    fresh = [i for i in req.items if i.a.strip().casefold() not in known]
+    items = _build_items(fresh, found["source"], found["target"])
+    try:
+        return lists.add_items(list_id, user.name, user.admin, items)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 

@@ -168,7 +168,25 @@ const I18N = {
   "Kein Google-Key für die Texterkennung": {"en": "No Google key for text recognition", "fr": "Pas de clé Google pour la reconnaissance de texte", "rw": "Nta funguro ya Google yo gusoma umwandiko"},
   "Einträge max. 100 Zeichen": {"en": "Entries max. 100 characters", "fr": "Entrées : 100 caractères maximum", "rw": "Buri jambo ntirirenze inyuguti 100"},
   "Ungültige Anfrage": {"en": "Invalid request", "fr": "Requête invalide", "rw": "Ibyasabwe ntibikwiye"},
-  "Zu viele Listen": {"en": "Too many lists", "fr": "Trop de listes", "rw": "Hari urutonde rwinshi cyane"}
+  "Zu viele Listen": {"en": "Too many lists", "fr": "Trop de listes", "rw": "Hari urutonde rwinshi cyane"},
+  "Liste ist voll": {"en": "The list is full", "fr": "La liste est pleine", "rw": "Urutonde rwuzuye"},
+  "Nur Besitzer oder Admin dürfen ergänzen": {"en": "Only the owner or admin may add words", "fr": "Seul le propriétaire ou l'admin peut ajouter des mots", "rw": "Nnyirurwo cyangwa admin gusa ni bo bashobora kongeramo amagambo"},
+  "Alltag": {"en": "Everyday", "fr": "Quotidien", "rw": "Ubuzima bwa buri munsi"},
+  "Essen & Einkaufen": {"en": "Food & shopping", "fr": "Repas et courses", "rw": "Ibiryo n'ubucuruzi"},
+  "Reisen & Unterwegs": {"en": "Travel & on the road", "fr": "Voyage et déplacements", "rw": "Ingendo n'urugendo"},
+  "Gesundheit": {"en": "Health", "fr": "Santé", "rw": "Ubuzima"},
+  "Familie & Freunde": {"en": "Family & friends", "fr": "Famille et amis", "rw": "Umuryango n'inshuti"},
+  "Test starten": {"en": "Start quiz", "fr": "Lancer le test", "rw": "Tangira ikizamini"},
+  "Wörter hinzufügen": {"en": "Add words", "fr": "Ajouter des mots", "rw": "Ongeramo amagambo"},
+  "Hinzufügen": {"en": "Add", "fr": "Ajouter", "rw": "Ongeraho"},
+  "Listen": {"en": "Lists", "fr": "Listes", "rw": "Urutonde"},
+  "Alle": {"en": "All", "fr": "Toutes", "rw": "Zose"},
+  "Meine": {"en": "Mine", "fr": "Les miennes", "rw": "Izanjye"},
+  "Von anderen": {"en": "From others", "fr": "Des autres", "rw": "Iz'abandi"},
+  "Von {0}": {"en": "From {0}", "fr": "De {0}", "rw": "Iya {0}"},
+  "Bereits vorhanden oder leer.": {"en": "Already in the list, or empty.", "fr": "Déjà dans la liste, ou vide.", "rw": "Biri mu rutonde cyangwa nta kintu kirimo."},
+  "Keine Listen in dieser Auswahl.": {"en": "No lists in this selection.", "fr": "Aucune liste dans cette sélection.", "rw": "Nta rutonde ruri muri aya mahitamo."},
+  "Eine Zeile pro Wort, z. B. Wasser = amazi": {"en": "One word per line, e.g. water = amazi", "fr": "Un mot par ligne, p. ex. eau = amazi", "rw": "Ijambo rimwe kuri buri murongo, urugero: amazi = water"}
 };
 
 let uiLang = "de";
