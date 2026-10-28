@@ -1,10 +1,11 @@
 "use strict";
 // Service Worker nur für die App-Hülle; API-Aufrufe gehen immer ans Netz.
-const CACHE = "shell-v20";
+const CACHE = "shell-v21";
 const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/i18n.js", "/manifest.json", "/icon-192.png", "/phrases.json", "/dictionary.json"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  // "reload": am Browser-Cache vorbei, damit keine alten Dateien in den neuen Cache geraten
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
@@ -20,7 +21,7 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/")) return;
   // Netz zuerst, damit Updates sofort ankommen; Cache nur als Rückfall (offline).
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request.url, { cache: "no-cache" }) // immer beim Server nachfragen, nie alte Kopie aus dem Browser-Cache
       .then((res) => {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

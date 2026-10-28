@@ -282,6 +282,30 @@
 </div>
 <div id="img-zoom" class="zoom img-zoom" hidden role="dialog" aria-label="Foto"><img id="img-zoom-pic" alt=""></div>
 <div id="zoom" class="zoom" hidden role="dialog" aria-label="Großanzeige"><p id="zoom-text"></p><small>Tippen zum Schließen</small></div>
+<script>
+// Selbstheilung nach Updates: Startet die App nicht (z. B. alte app.js zur neuen Seite aus einem Cache),
+// werden alle Caches geleert, die App-Dateien frisch geholt und einmal neu geladen.
+(function () {
+  function recover() {
+    if (window.appReady) return;
+    var done = false;
+    try { done = sessionStorage.getItem("recovered") === "1"; sessionStorage.setItem("recovered", "1"); } catch (e) { done = true; }
+    if (done) {
+      var s = document.getElementById("status");
+      if (s) s.textContent = "Die App konnte nicht starten. Bitte App ganz schließen und neu öffnen.";
+      return;
+    }
+    var files = ["/", "/index.html", "/app.js", "/i18n.js", "/style.css", "/sw.js"];
+    Promise.all([
+      window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n); })); }) : 0,
+      navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister(); })); }) : 0,
+      Promise.all(files.map(function (f) { return fetch(f, { cache: "reload" }).catch(function () {}); })),
+    ]).catch(function () {}).then(function () { location.reload(); });
+  }
+  window.addEventListener("error", function () { setTimeout(recover, 300); });
+  window.addEventListener("load", function () { setTimeout(recover, 2000); });
+})();
+</script>
 <script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
