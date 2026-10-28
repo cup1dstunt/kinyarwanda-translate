@@ -208,6 +208,8 @@ footer { text-align: center; }
 
 /* iOS-Tastatur: Tab-Leiste weg, solange ein Feld fokussiert ist */
 body.typing .tabbar { display: none; }
+/* Platz unter dem Inhalt, so hoch wie die Tastatur, damit sich das Eingabefeld darüber schieben lässt */
+body.typing main { padding-bottom: calc(24px + var(--kb, 0px)); }
 .dialog { display: grid; gap: 8px; }
 .dialog h3 { margin: 8px 4px 0; font-size: 1rem; color: var(--muted); }
 
