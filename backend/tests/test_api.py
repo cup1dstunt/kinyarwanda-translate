@@ -419,3 +419,9 @@ def test_own_phrases(web, monkeypatch):
     assert web.get("/api/my-phrases", headers={"X-App-Password": code}).json()["phrases"] == []  # pro Person getrennt
     assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 200
     assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 404
+
+
+def test_static_files_are_revalidated(web):
+    # sonst hält iOS alte app.js fest und die App startet nach einem Update nicht
+    assert web.get("/app.js").headers["cache-control"] == "no-cache"
+    assert web.get("/").headers["cache-control"] == "no-cache"

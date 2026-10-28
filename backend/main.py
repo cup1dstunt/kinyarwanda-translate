@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -10,6 +10,19 @@ from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
 app = FastAPI(title="Übersetzer-PWA")
+
+
+@app.middleware("http")
+async def revalidate_static(request: Request, call_next):
+    """App-Dateien immer beim Server nachfragen (ETag macht das billig).
+
+    Ohne diese Angabe hält iOS alte Dateien fest; dann passen index.html und app.js
+    nach einem Update nicht zusammen und die App bleibt leer.
+    """
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
 
 
 def require_password(x_app_password: str = Header(default="")) -> users.User:

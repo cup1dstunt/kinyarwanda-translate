@@ -1263,3 +1263,5 @@ $("ui-lang").value = uiLang;
 $("ui-lang").onchange = () => { store.set("ui-lang", $("ui-lang").value); location.reload(); };
 
 init();
+window.appReady = true; // für die Selbstheilung in index.html: Script lief bis zum Ende
+try { sessionStorage.removeItem("recovered"); } catch { /* ignorieren */ }
