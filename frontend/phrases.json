@@ -1,5 +1,212 @@
 [
  {
+  "c": "Gespräche",
+  "d": "Morgens",
+  "s": "a",
+  "de": "Guten Morgen! Hast du gut geschlafen?",
+  "fr": "Bonjour ! Tu as bien dormi ?",
+  "en": "Good morning! Did you sleep well?",
+  "rw": "Waramutse! Waraye neza?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Morgens",
+  "s": "b",
+  "de": "Ja, ich habe gut geschlafen, und du?",
+  "fr": "Oui, j'ai bien dormi, et toi ?",
+  "en": "Yes, I slept well, and you?",
+  "rw": "Yego, naraye neza, wowe se?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Morgens",
+  "s": "a",
+  "de": "Ich habe auch gut geschlafen.",
+  "fr": "Moi aussi, j'ai bien dormi.",
+  "en": "I slept well too.",
+  "rw": "Nanjye naraye neza."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Auf der Straße",
+  "s": "a",
+  "de": "Hallo, wie geht es dir?",
+  "fr": "Salut, comment vas-tu ?",
+  "en": "Hello, how are you?",
+  "rw": "Muraho, amakuru yawe?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Auf der Straße",
+  "s": "b",
+  "de": "Mir geht es gut, und dir?",
+  "fr": "Je vais bien, et toi ?",
+  "en": "I'm fine, and you?",
+  "rw": "Ni meza, wowe se?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Auf der Straße",
+  "s": "a",
+  "de": "Mir geht es auch gut.",
+  "fr": "Je vais bien aussi.",
+  "en": "I'm fine too.",
+  "rw": "Nanjye meze neza."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Kennenlernen",
+  "s": "a",
+  "de": "Wie heißt du?",
+  "fr": "Comment tu t'appelles ?",
+  "en": "What's your name?",
+  "rw": "Witwa nde?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Kennenlernen",
+  "s": "b",
+  "de": "Ich heiße Aline. Und du?",
+  "fr": "Je m'appelle Aline. Et toi ?",
+  "en": "My name is Aline. And you?",
+  "rw": "Nitwa Aline. Wowe se?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Kennenlernen",
+  "s": "a",
+  "de": "Ich heiße Jonas. Woher kommst du?",
+  "fr": "Je m'appelle Jonas. D'où viens-tu ?",
+  "en": "My name is Jonas. Where are you from?",
+  "rw": "Nitwa Jonas. Uturuka he?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Kennenlernen",
+  "s": "b",
+  "de": "Ich komme aus Kigali.",
+  "fr": "Je viens de Kigali.",
+  "en": "I'm from Kigali.",
+  "rw": "Nturuka i Kigali."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Kennenlernen",
+  "s": "a",
+  "de": "Freut mich!",
+  "fr": "Enchanté !",
+  "en": "Nice to meet you!",
+  "rw": "Nishimiye kukumenya!"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Geschäft",
+  "s": "a",
+  "de": "Hallo, ich hätte gerne Brot.",
+  "fr": "Bonjour, je voudrais du pain.",
+  "en": "Hello, I would like some bread.",
+  "rw": "Muraho, nashakaga umugati."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Geschäft",
+  "s": "b",
+  "de": "Gerne. Sonst noch etwas?",
+  "fr": "Bien sûr. Autre chose ?",
+  "en": "Sure. Anything else?",
+  "rw": "Yego. Hari ikindi?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Geschäft",
+  "s": "a",
+  "de": "Nein, danke. Was kostet das?",
+  "fr": "Non, merci. Combien ça coûte ?",
+  "en": "No, thank you. How much is it?",
+  "rw": "Oya, murakoze. Ni angahe?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Geschäft",
+  "s": "b",
+  "de": "Das macht 1000 Franc.",
+  "fr": "Ça fait 1000 francs.",
+  "en": "That's 1000 francs.",
+  "rw": "Ni amafaranga igihumbi."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Geschäft",
+  "s": "a",
+  "de": "Hier, bitte. Danke!",
+  "fr": "Voilà, merci !",
+  "en": "Here you go, thank you!",
+  "rw": "Ngaya, murakoze!"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Restaurant",
+  "s": "b",
+  "de": "Guten Tag, was möchten Sie?",
+  "fr": "Bonjour, que désirez-vous ?",
+  "en": "Hello, what would you like?",
+  "rw": "Muraho, mwifuza iki?"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Restaurant",
+  "s": "a",
+  "de": "Ich hätte gerne Reis mit Bohnen und ein Wasser.",
+  "fr": "Je voudrais du riz avec des haricots et une eau.",
+  "en": "I would like rice with beans and a water.",
+  "rw": "Nashakaga umuceri n'ibishyimbo n'amazi."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Restaurant",
+  "s": "b",
+  "de": "Gerne, kommt sofort.",
+  "fr": "Avec plaisir, ça arrive tout de suite.",
+  "en": "Sure, coming right up.",
+  "rw": "Yego, biraza ako kanya."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Im Restaurant",
+  "s": "a",
+  "de": "Ich möchte bezahlen.",
+  "fr": "Je voudrais payer.",
+  "en": "I'd like to pay.",
+  "rw": "Ndashaka kwishyura."
+ },
+ {
+  "c": "Gespräche",
+  "d": "Gute Nacht",
+  "s": "a",
+  "de": "Gute Nacht, schlaf gut!",
+  "fr": "Bonne nuit, dors bien !",
+  "en": "Good night, sleep well!",
+  "rw": "Ijoro ryiza, urare neza!"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Gute Nacht",
+  "s": "b",
+  "de": "Danke, du auch!",
+  "fr": "Merci, toi aussi !",
+  "en": "Thanks, you too!",
+  "rw": "Urakoze, nawe urare neza!"
+ },
+ {
+  "c": "Gespräche",
+  "d": "Gute Nacht",
+  "s": "a",
+  "de": "Bis morgen!",
+  "fr": "À demain !",
+  "en": "See you tomorrow!",
+  "rw": "Tuzabonana ejo!"
+ },
+ {
   "c": "Alltagssprache",
   "de": "Hallo",
   "fr": "Bonjour / Salut",

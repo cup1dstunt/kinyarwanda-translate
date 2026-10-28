@@ -33,7 +33,7 @@ function fill(select, values, label = (v) => v) {
   }));
 }
 
-const TABS = { translate: "translate", chat: "chat", phrases: "phrases", favs: "favs", currency: "currency" };
+const TABS = { translate: "translate", chat: "chat", phrases: "phrases", settings: "settings", currency: "currency" };
 
 function showLogin() {
   $("login").hidden = false; $("tabbar").hidden = true;
@@ -47,7 +47,7 @@ function showTab(name) {
     $(view).hidden = tab !== name;
     $("tab-" + tab).classList.toggle("active", tab === name);
   }
-  if (name === "favs") renderFavs();
+  if (name === "settings") $("rate-count").textContent = loadJson("ratings").length;
   if (name === "phrases") loadPhrases();
   if (name === "chat" && room && !$("chat-room").hidden) startPolling();
   if (name !== "chat") stopPolling();
@@ -94,7 +94,7 @@ $("password").onkeydown = (e) => { if (e.key === "Enter") $("login-btn").click()
 $("tab-translate").onclick = () => showTab("translate");
 $("tab-currency").onclick = () => showTab("currency");
 $("tab-chat").onclick = () => showTab("chat");
-$("tab-favs").onclick = () => showTab("favs");
+$("tab-settings").onclick = () => showTab("settings");
 $("tab-phrases").onclick = () => showTab("phrases");
 
 async function translate() {
@@ -363,7 +363,7 @@ $("zoom").onclick = () => { $("zoom").hidden = true; };
 $("show").onclick = () => zoom($("output").value);
 
 // --- Favoriten / Phrasebook (lokal, auch offline nutzbar) ---
-const CATEGORIES = ["Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
+const CATEGORIES = ["Alltagssprache", "Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
 
 function loadJson(key) {
   try { return JSON.parse(store.get(key) || "[]"); } catch { return []; }
@@ -389,39 +389,31 @@ $("fav").onclick = () => {
   setTimeout(() => $("fav").classList.remove("on"), 1500);
 };
 
-function renderFavs() {
-  const all = loadJson("favs");
-  const cats = [...new Set([...CATEGORIES, ...all.map((f) => f.cat)])];
-  const current = $("fav-filter").value || "";
-  fill($("fav-filter"), ["", ...cats], (c) => t(c || "Alle Kategorien"));
-  $("fav-filter").value = cats.includes(current) ? current : "";
-  const shown = all.filter((f) => !$("fav-filter").value || f.cat === $("fav-filter").value);
-  $("fav-empty").hidden = shown.length > 0;
-  $("fav-list").replaceChildren(...shown.map((f) => {
-    const card = document.createElement("div");
-    card.className = "card fav";
-    const meta = document.createElement("small");
-    meta.textContent = `${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
-    const inp = document.createElement("div");
-    inp.textContent = f.input;
-    const out = document.createElement("strong");
-    out.textContent = f.output;
-    const row = document.createElement("div");
-    row.className = "fav-actions";
-    row.append(
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
-      mkBtn("#i-trash", "Löschen", () => {
-        store.set("favs", JSON.stringify(loadJson("favs").filter((x) => favId(x) !== favId(f))));
-        renderFavs();
-      }),
-    );
-    card.append(meta, inp, out, row);
-    return card;
-  }));
-  $("rate-count").textContent = loadJson("ratings").length;
+function setFavs(list) { store.set("favs", JSON.stringify(list)); }
+
+// Karte für einen eigenen Favoriten (im Phrasen-Tab angezeigt)
+function favCard(f) {
+  const card = document.createElement("div");
+  card.className = "card fav";
+  const meta = document.createElement("small");
+  meta.textContent = `★ ${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
+  const inp = document.createElement("div");
+  inp.textContent = f.input;
+  const out = document.createElement("strong");
+  out.textContent = f.output;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  row.append(
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
+    mkBtn("#i-trash", "Löschen", () => {
+      setFavs(loadJson("favs").filter((x) => favId(x) !== favId(f)));
+      renderPhrases();
+    }),
+  );
+  card.append(meta, inp, out, row);
+  return card;
 }
-$("fav-filter").onchange = renderFavs;
 
 // --- Zugänge (nur Admin) ---
 async function renderAdmin() {
@@ -507,69 +499,118 @@ $("rate-export").onclick = async () => {
   }
 };
 $("rate-clear").onclick = () => {
-  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); renderFavs(); }
+  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); $("rate-count").textContent = "0"; }
 };
 
 // --- Phrasenbuch: fertige Sätze, Kinyarwanda ungeprüft bis zur Bestätigung ---
 let phrases = null;
 const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{}"); } catch { return {}; } };
 
+const FAVS = "__favs", DIALOGS = "Gespräche";
+
 async function loadPhrases() {
   if (!phrases) {
     try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
-    const cats = [...new Set(phrases.map((p) => p.c))];
-    fill($("ph-cat"), cats, (c) => t(c));
     const targets = UI_LANGS.filter((l) => l !== uiLang);
     fill($("ph-lang"), targets, (l) => "→ " + LANG_LABELS[l]);
     $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
   }
+  // Kategorien jedes Mal neu, weil eigene Favoriten neue Kategorien mitbringen können
+  const cats = [...new Set([...phrases.map((p) => p.c), ...loadJson("favs").map((f) => f.cat)])];
+  const current = $("ph-cat").value || store.get("ph-cat") || (loadJson("favs").length ? FAVS : DIALOGS);
+  fill($("ph-cat"), [FAVS, ...cats], (c) => (c === FAVS ? "★ " + t("Favoriten") : t(c)));
+  $("ph-cat").value = [FAVS, ...cats].includes(current) ? current : DIALOGS;
   renderPhrases();
+}
+
+function phraseText(p, lang) {
+  const r = reviews()[p.de + "|" + lang];
+  return { text: r && r.text ? r.text : p[lang], checked: !!r };
+}
+
+// Ein fertiger Satz als Karte oder (im Gespräch) als Sprechblase
+function phraseCard(p, lang, className) {
+  const { text, checked } = phraseText(p, lang);
+  const card = document.createElement("div");
+  card.className = className;
+  const meta = document.createElement("small");
+  meta.textContent = lang === "rw" ? t(checked ? "✓ geprüft" : "ungeprüft") : "";
+  const src = document.createElement("div");
+  src.textContent = p[uiLang];
+  const out = document.createElement("strong");
+  out.textContent = text;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  const review = (good, correction) => {
+    addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
+    const all = reviews();
+    all[p.de + "|" + lang] = { text: correction || p[lang] };
+    store.set("phrase-review", JSON.stringify(all));
+    renderPhrases();
+  };
+  const fav = { cat: p.c, source: uiLang, target: lang, input: p[uiLang], output: text };
+  const isFav = loadJson("favs").some((f) => favId(f) === favId(fav));
+  const star = mkBtn("#i-star", isFav ? "Aus Favoriten entfernen" : "Als Favorit speichern", () => {
+    const rest = loadJson("favs").filter((f) => favId(f) !== favId(fav));
+    setFavs(isFav ? rest : [fav, ...rest]);
+    renderPhrases();
+  });
+  star.classList.toggle("on", isFav);
+  row.append(
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
+    star,
+  );
+  if (lang === "rw") {
+    const up = document.createElement("button");
+    up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
+    up.onclick = () => review(true, "");
+    const down = document.createElement("button");
+    down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
+    down.onclick = () => {
+      const fix = window.prompt(t("Richtige Übersetzung:"), text);
+      if (fix !== null && fix.trim()) review(false, fix.trim());
+    };
+    row.append(up, down);
+  }
+  card.append(...(meta.textContent ? [meta] : []), src, out, row);
+  return card;
+}
+
+// Kurzes Gespräch: Zeilen mit gleichem Titel ("d"), abwechselnd links (a) und rechts (b)
+function dialogCard(title, lines, lang) {
+  const box = document.createElement("div");
+  box.className = "dialog";
+  const head = document.createElement("h3");
+  head.textContent = t(title);
+  const log = document.createElement("div");
+  log.className = "chat-log";
+  log.append(...lines.map((p) => phraseCard(p, lang, "bubble fav " + (p.s === "b" ? "b" : "a"))));
+  box.append(head, log);
+  return box;
 }
 
 function renderPhrases() {
   if (!phrases) return;
-  const lang = $("ph-lang").value, rev = reviews();
+  const cat = $("ph-cat").value, lang = $("ph-lang").value, favs = loadJson("favs");
+  store.set("ph-cat", cat);
+  $("ph-lang").hidden = cat === FAVS;
+  $("ph-hint").hidden = cat === FAVS;
+  $("fav-empty").hidden = !(cat === FAVS && !favs.length);
   $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
-  $("ph-list").replaceChildren(...phrases.filter((p) => p.c === $("ph-cat").value).map((p) => {
-    const key = p.de + "|" + lang;
-    const r = rev[key];
-    const text = r && r.text ? r.text : p[lang];
-    const card = document.createElement("div");
-    card.className = "card fav";
-    const meta = document.createElement("small");
-    meta.textContent = lang === "rw" ? t(r ? "✓ geprüft" : "ungeprüft") : "";
-    const de = document.createElement("div");
-    de.textContent = p[uiLang];
-    const out = document.createElement("strong");
-    out.textContent = text;
-    const row = document.createElement("div");
-    row.className = "fav-actions";
-    const review = (good, correction) => {
-      addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
-      const all = reviews();
-      all[key] = { text: correction || p[lang] };
-      store.set("phrase-review", JSON.stringify(all));
-      renderPhrases();
-    };
-    row.append(
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
-    );
-    if (lang === "rw") {
-      const up = document.createElement("button");
-      up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
-      up.onclick = () => review(true, "");
-      const down = document.createElement("button");
-      down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
-      down.onclick = () => {
-        const fix = window.prompt(t("Richtige Übersetzung:"), text);
-        if (fix !== null && fix.trim()) review(false, fix.trim());
-      };
-      row.append(up, down);
-    }
-    card.append(...(meta.textContent ? [meta] : []), de, out, row);
-    return card;
-  }));
+  if (cat === FAVS) { $("ph-list").replaceChildren(...favs.map(favCard)); return; }
+  const list = phrases.filter((p) => p.c === cat);
+  // eigene Favoriten dieser Kategorie oben, außer sie stammen selbst aus dem Phrasenbuch (die haben dort den Stern)
+  const own = favs.filter((f) => f.cat === cat && !list.some((p) => p[f.source] === f.input));
+  let cards;
+  if (cat === DIALOGS) {
+    const groups = new Map();
+    for (const p of list) groups.set(p.d, [...(groups.get(p.d) || []), p]);
+    cards = [...groups].map(([title, lines]) => dialogCard(title, lines, lang));
+  } else {
+    cards = list.map((p) => phraseCard(p, lang, "card fav"));
+  }
+  $("ph-list").replaceChildren(...own.map(favCard), ...cards);
 }
 $("ph-cat").onchange = $("ph-lang").onchange = renderPhrases;
 
@@ -916,7 +957,6 @@ if ("serviceWorker" in navigator) {
 }
 
 applyUi();
-$("tab-favs").querySelector("span").textContent = t("Favoriten/Einstellungen").replace("/", "/\u200b"); // darf nach dem Schrägstrich umbrechen
 renderHistory();
 updateControls();
 
