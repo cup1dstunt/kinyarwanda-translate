@@ -136,6 +136,27 @@ document.addEventListener("focusout", () => {
   setTimeout(() => { if (!typing()) document.body.classList.remove("typing"); }, 50);
 });
 
+// iOS verkleinert die Seite für die Tastatur nicht und schiebt die Ansicht beim Fokussieren oft zu weit.
+// Darum die sichtbare Fläche über der Tastatur messen (visualViewport), unten so viel Platz wie die Tastatur
+// hoch ist anhängen (--kb) und das aktive Feld selbst in den sichtbaren Bereich schieben.
+const vv = window.visualViewport;
+function keepFieldVisible() {
+  if (!vv) return;
+  const kb = Math.max(0, Math.round(document.documentElement.clientHeight - vv.height * vv.scale));
+  document.documentElement.style.setProperty("--kb", (kb > 80 ? kb : 0) + "px");
+  const el = document.activeElement;
+  if (kb <= 80 || !isField(el) || el.tagName === "SELECT") return;
+  const r = el.getBoundingClientRect();
+  const top = vv.offsetTop + 12, bottom = vv.offsetTop + vv.height - 12;
+  // Feld passt: ganz zeigen; Feld zu hoch: Anfang zeigen
+  const delta = r.height > bottom - top || r.top < top ? r.top - top : Math.max(0, r.bottom - bottom);
+  if (Math.abs(delta) > 4) window.scrollBy(0, delta);
+}
+let kbTimer = null;
+const scheduleKeep = () => { clearTimeout(kbTimer); kbTimer = setTimeout(keepFieldVisible, 150); };
+if (vv) vv.addEventListener("resize", scheduleKeep);
+document.addEventListener("focusin", scheduleKeep);
+
 // --- Sprachausgabe (nur de/fr) ---
 const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
 
