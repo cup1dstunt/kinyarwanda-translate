@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import cache, currency, lists, ocr, rooms, tts, users
+from . import cache, currency, lists, ocr, rooms, tts, userphrases, users
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -38,6 +38,26 @@ class NewList(BaseModel):
     source: str
     target: str
     items: list[VocabItem]
+    category: str = "Sonstiges"
+    to: list[str] = []
+
+
+class ShareList(BaseModel):
+    to: list[str]
+
+
+class MoreItems(BaseModel):
+    items: list[VocabItem]
+
+
+class NewPhrase(BaseModel):
+    text: str
+    lang: str
+    category: str = "Eigene"
+
+
+class PhrasesFromList(BaseModel):
+    list_id: str
 
 
 class RoomJoin(BaseModel):
@@ -166,8 +186,53 @@ def convert(req: ConvertRequest):
 
 
 @app.get("/api/lists", dependencies=[Depends(require_password)])
-def lists_get():
-    return {"lists": lists.all_lists()}
+def lists_get(user: users.User = Depends(require_password)):
+    return {"lists": lists.visible_lists(user.name), "categories": lists.CATEGORIES}
+
+
+def _known_recipients(names: list[str], me: str) -> list[str]:
+    valid = {u["name"] for u in users.list_users()} | {"Admin"}
+    unknown = [n for n in names if n not in valid]
+    if unknown:
+        raise HTTPException(400, "Unbekannte Person")
+    return [n for n in dict.fromkeys(names) if n != me]
+
+
+@app.get("/api/people")
+def people(user: users.User = Depends(require_password)):
+    names = {u["name"] for u in users.list_users()} | {"Admin"}
+    return {"people": sorted(names - {user.name}, key=str.casefold)}
+
+
+@app.post("/api/lists/{list_id}/share")
+def lists_share(list_id: str, req: ShareList, user: users.User = Depends(require_password)):
+    result = lists.share(list_id, user.name, user.admin, _known_recipients(req.to, user.name))
+    if result is None:
+        raise HTTPException(403, "Nur Besitzer oder Admin dürfen senden")
+    if result is False:
+        raise HTTPException(404, "Liste nicht gefunden")
+    return result
+
+
+@app.post("/api/lists/{list_id}/leave")
+def lists_leave(list_id: str, user: users.User = Depends(require_password)):
+    if not lists.leave(list_id, user.name):
+        raise HTTPException(404, "Liste nicht gefunden")
+    return {"ok": True}
+
+
+def _build_items(raw: list[VocabItem], source: str, target: str) -> list[dict]:
+    entries = [(i.a.strip(), i.b.strip()) for i in raw if i.a.strip()]
+    if not entries or len(entries) > lists.MAX_ITEMS:
+        raise HTTPException(400, f"1 bis {lists.MAX_ITEMS} Einträge nötig")
+    items = []
+    for a, b in entries:
+        if len(a) > 100 or len(b) > 100:
+            raise HTTPException(413, "Einträge max. 100 Zeichen")
+        if not b:
+            b = translate_text(a, source, target)[0]
+        items.append({"a": a, "b": b})
+    return items
 
 
 @app.post("/api/lists")
@@ -176,18 +241,26 @@ def lists_add(req: NewList, user: users.User = Depends(require_password)):
         raise HTTPException(400, "Titel fehlt")
     if req.source not in LANGUAGES or req.target not in LANGUAGES or req.source == req.target:
         raise HTTPException(400, "Ungültige Sprachwahl")
-    entries = [(i.a.strip(), i.b.strip()) for i in req.items if i.a.strip()]
-    if not entries or len(entries) > lists.MAX_ITEMS:
-        raise HTTPException(400, f"1 bis {lists.MAX_ITEMS} Einträge nötig")
-    items = []
-    for a, b in entries:
-        if len(a) > 100 or len(b) > 100:
-            raise HTTPException(413, "Einträge max. 100 Zeichen")
-        if not b:
-            b = translate_text(a, req.source, req.target)[0]
-        items.append({"a": a, "b": b})
+    category = req.category if req.category in lists.CATEGORIES else "Sonstiges"
+    items = _build_items(req.items, req.source, req.target)
     try:
-        return lists.add(user.name, req.title, req.source, req.target, items)
+        return lists.add(user.name, req.title, req.source, req.target, items, category, _known_recipients(req.to, user.name))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/lists/{list_id}/items")
+def lists_add_items(list_id: str, req: MoreItems, user: users.User = Depends(require_password)):
+    found = next((x for x in lists.visible_lists(user.name) if x["id"] == list_id), None)
+    if found is None:
+        raise HTTPException(404, "Liste nicht gefunden")
+    if not user.admin and found["owner"] != user.name:
+        raise HTTPException(403, "Nur Besitzer oder Admin dürfen ergänzen")
+    known = {i["a"].casefold() for i in found["items"]}  # Doppelte vorab raus, damit nichts unnötig übersetzt wird
+    fresh = [i for i in req.items if i.a.strip().casefold() not in known]
+    items = _build_items(fresh, found["source"], found["target"])
+    try:
+        return lists.add_items(list_id, user.name, user.admin, items)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
@@ -199,6 +272,61 @@ def lists_delete(list_id: str, user: users.User = Depends(require_password)):
         raise HTTPException(403, "Nur Besitzer oder Admin dürfen löschen")
     if result is False:
         raise HTTPException(404, "Liste nicht gefunden")
+    return {"ok": True}
+
+
+def _full_phrase(texts: dict[str, str], category: str) -> dict:
+    """Ergänzt fehlende Sprachen per Übersetzung (cache-gestützt)."""
+    src = next(iter(texts))
+    out = {"c": category}
+    for lang in LANGUAGES:
+        out[lang] = texts[lang] if lang in texts else translate_text(texts[src], src, lang)[0]
+    return out
+
+
+@app.get("/api/my-phrases")
+def my_phrases(user: users.User = Depends(require_password)):
+    return {"phrases": userphrases.mine(user.name)}
+
+
+@app.post("/api/my-phrases")
+def my_phrases_add(req: NewPhrase, user: users.User = Depends(require_password)):
+    if req.lang not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    text = req.text.strip()
+    if not text or len(text) > 200:
+        raise HTTPException(400, "1 bis 200 Zeichen nötig")
+    phrase = _full_phrase({req.lang: text}, req.category.strip()[:30] or "Eigene")
+    try:
+        added = userphrases.add_many(user.name, [{**phrase, "de": phrase["de"]}])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"added": len(added)}
+
+
+@app.post("/api/my-phrases/from-list")
+def my_phrases_from_list(req: PhrasesFromList, user: users.User = Depends(require_password)):
+    found = next((x for x in lists.visible_lists(user.name) if x["id"] == req.list_id), None)
+    if found is None:
+        raise HTTPException(404, "Liste nicht gefunden")
+    existing = {p["de"].casefold() for p in userphrases.mine(user.name)}
+    entries = []
+    for it in found["items"]:
+        texts = {found["source"]: it["a"], found["target"]: it["b"]}
+        if texts.get("de", "").casefold() in existing:
+            continue
+        entries.append(_full_phrase(texts, "Eigene"))
+    try:
+        added = userphrases.add_many(user.name, entries)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"added": len(added)}
+
+
+@app.delete("/api/my-phrases/{phrase_id}")
+def my_phrases_delete(phrase_id: str, user: users.User = Depends(require_password)):
+    if not userphrases.delete(user.name, phrase_id):
+        raise HTTPException(404, "Phrase nicht gefunden")
     return {"ok": True}
 
 

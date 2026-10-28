@@ -154,8 +154,14 @@ def test_provider_error_shows_google_message():
 def test_phrasebook_complete(web):
     phrases = web.get("/phrases.json").json()
     assert {p["c"] for p in phrases} >= {"Alltagssprache", "Arzt", "Behörde", "Einkaufen"}
-    for p in phrases:
+    dictionary = web.get("/dictionary.json").json()
+    assert len(dictionary) > 200
+    for p in phrases + dictionary:
         assert all(p.get(k, "").strip() for k in ("de", "fr", "en", "rw")), p
+    de = [p["de"] for p in phrases + dictionary]
+    assert len(de) == len(set(de))  # keine doppelten deutschen Einträge
+    entries = _i18n_entries()
+    assert [c for c in {p["c"] for p in phrases + dictionary} if c not in entries] == []
 
 
 def test_access_codes(web):
@@ -225,14 +231,25 @@ def test_vocab_lists(web, monkeypatch):
     monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
     body = {"title": "Markt", "source": "de", "target": "rw",
             "items": [{"a": "Wasser", "b": "amazi"}, {"a": "Brot"}, {"a": "  "}]}
-    made = web.post("/api/lists", headers=H, json=body).json()
-    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
     code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    made = web.post("/api/lists", headers=H, json={**body, "to": ["Anna"]}).json()
+    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
     ha = {"X-App-Password": code}
     assert web.get("/api/lists", headers=ha).json()["lists"][0]["owner"] == "Admin"
+    assert web.get("/api/lists", headers=ha).json()["categories"][-1] == "Sonstiges"
+    assert made["category"] == "Sonstiges"
+    # Wörter ergänzen: nur Besitzer/Admin, Doppelte werden übersprungen, fehlende Übersetzung automatisch
+    more = {"items": [{"a": "wasser", "b": "x"}, {"a": "Milch"}]}
+    assert web.post(f"/api/lists/{made['id']}/items", headers=ha, json=more).status_code == 403
+    grown = web.post(f"/api/lists/{made['id']}/items", headers=H, json=more).json()
+    assert [i["a"] for i in grown["items"]] == ["Wasser", "Brot", "Milch"]
+    assert grown["items"][2]["b"] == "[rw] Milch"
+    assert web.post("/api/lists/nope/items", headers=H, json=more).status_code == 404
     assert web.delete(f"/api/lists/{made['id']}", headers=ha).status_code == 403  # fremde Liste
     assert web.post("/api/lists", headers=ha, json={**body, "title": ""}).status_code == 400
-    mine = web.post("/api/lists", headers=ha, json=body).json()
+    mine = web.post("/api/lists", headers=ha, json={**body, "category": "Essen & Einkaufen"}).json()
+    assert mine["category"] == "Essen & Einkaufen"
+    assert web.post("/api/lists", headers=ha, json={**body, "category": "Unsinn"}).json()["category"] == "Sonstiges"
     assert web.delete(f"/api/lists/{mine['id']}", headers=ha).status_code == 200
     assert web.delete(f"/api/lists/{made['id']}", headers=H).status_code == 200
     assert web.delete("/api/lists/nope", headers=H).status_code == 404
@@ -307,3 +324,49 @@ def test_i18n_covers_html_and_server_messages():
     messages = re.findall(r'HTTPException\(\d+, "([^"{]+)"\)', main)
     messages += re.findall(r'raise RoomError\("([^"{]+)"\)', (root / "backend" / "rooms.py").read_text(encoding="utf-8"))
     assert [m for m in messages if m not in entries] == []
+
+
+def test_send_lists(web):
+    body = {"title": "Markt", "source": "de", "target": "rw", "items": [{"a": "Wasser", "b": "amazi"}]}
+    anna = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    ben = web.post("/api/admin/users", headers=H, json={"name": "Ben"}).json()["code"]
+    ha, hb = {"X-App-Password": anna}, {"X-App-Password": ben}
+    assert web.get("/api/people", headers=ha).json()["people"] == ["Admin", "Ben"]
+    mine = web.post("/api/lists", headers=ha, json={**body, "to": ["Ben", "Anna"]}).json()
+    assert mine["to"] == ["Ben"]  # sich selbst filtert er heraus
+    assert web.post("/api/lists", headers=ha, json={**body, "to": ["Niemand"]}).status_code == 400
+    private = web.post("/api/lists", headers=ha, json=body).json()
+    assert [x["id"] for x in web.get("/api/lists", headers=hb).json()["lists"]] == [mine["id"]]  # nur die gesendete
+    assert web.get("/api/lists", headers=H).json()["lists"] == []  # auch der Admin sieht fremde Listen nicht
+    # Empfänger darf nicht ergänzen, senden oder löschen, aber „entfernen“
+    assert web.post(f"/api/lists/{mine['id']}/items", headers=hb, json={"items": [{"a": "x", "b": "y"}]}).status_code == 403
+    assert web.post(f"/api/lists/{mine['id']}/share", headers=hb, json={"to": ["Admin"]}).status_code == 403
+    assert web.delete(f"/api/lists/{mine['id']}", headers=hb).status_code == 403
+    assert web.post(f"/api/lists/{private['id']}/leave", headers=hb).status_code == 404
+    shared = web.post(f"/api/lists/{private['id']}/share", headers=ha, json={"to": ["Admin"]}).json()
+    assert shared["to"] == ["Admin"]
+    assert len(web.get("/api/lists", headers=H).json()["lists"]) == 1
+    assert web.post(f"/api/lists/{mine['id']}/leave", headers=hb).status_code == 200
+    assert web.get("/api/lists", headers=hb).json()["lists"] == []
+
+def test_own_phrases(web, monkeypatch):
+    class Fake:
+        def translate(self, text, source, target):
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    r = web.post("/api/my-phrases", headers=H, json={"text": "Guten Appetit", "lang": "de", "category": "Essen"})
+    assert r.json() == {"added": 1}
+    mine = web.get("/api/my-phrases", headers=H).json()["phrases"]
+    assert mine[0]["de"] == "Guten Appetit" and mine[0]["rw"] == "[rw] Guten Appetit" and mine[0]["c"] == "Essen"
+    assert web.post("/api/my-phrases", headers=H, json={"text": "Guten Appetit", "lang": "de"}).json() == {"added": 0}
+    made = web.post("/api/lists", headers=H, json={"title": "T", "source": "de", "target": "rw",
+                                                   "items": [{"a": "Wasser", "b": "amazi"}]}).json()
+    assert web.post("/api/my-phrases/from-list", headers=H, json={"list_id": made["id"]}).json() == {"added": 1}
+    wasser = [p for p in web.get("/api/my-phrases", headers=H).json()["phrases"] if p["de"] == "Wasser"][0]
+    assert wasser["rw"] == "amazi" and wasser["fr"] == "[fr] Wasser"
+    assert web.post("/api/my-phrases/from-list", headers=H, json={"list_id": "nope"}).status_code == 404
+    code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    assert web.get("/api/my-phrases", headers={"X-App-Password": code}).json()["phrases"] == []  # pro Person getrennt
+    assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 200
+    assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 404

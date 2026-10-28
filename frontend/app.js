@@ -504,37 +504,42 @@ $("rate-clear").onclick = () => {
 
 // --- Phrasenbuch: fertige Sätze, Kinyarwanda ungeprüft bis zur Bestätigung ---
 let phrases = null;
+const fold = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{}"); } catch { return {}; } };
 
 const FAVS = "__favs", DIALOGS = "Gespräche";
+let myPhrases = [];
 
 async function loadPhrases() {
   if (!phrases) {
-    try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
+    try {
+      const [base, more] = await Promise.all([fetch("/phrases.json"), fetch("/dictionary.json")]);
+      phrases = [...await base.json(), ...await more.json()];
+    } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
     const targets = UI_LANGS.filter((l) => l !== uiLang);
     fill($("ph-lang"), targets, (l) => "→ " + LANG_LABELS[l]);
     $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
   }
-  // Kategorien jedes Mal neu, weil eigene Favoriten neue Kategorien mitbringen können
-  const cats = [...new Set([...phrases.map((p) => p.c), ...loadJson("favs").map((f) => f.cat)])];
+  try { myPhrases = (await api("/api/my-phrases")).phrases.map((p) => ({ ...p, own: true })); } catch { myPhrases = []; }
+  // Kategorien jedes Mal neu, weil eigene Phrasen und Favoriten neue Kategorien mitbringen können
+  const cats = [...new Set([...phrases.map((p) => p.c), ...myPhrases.map((p) => p.c), ...loadJson("favs").map((f) => f.cat)])];
   const current = $("ph-cat").value || store.get("ph-cat") || (loadJson("favs").length ? FAVS : DIALOGS);
   fill($("ph-cat"), [FAVS, ...cats], (c) => (c === FAVS ? "★ " + t("Favoriten") : t(c)));
   $("ph-cat").value = [FAVS, ...cats].includes(current) ? current : DIALOGS;
+  fill($("ph-add-cat"), [...new Set([...cats.filter((c) => c !== DIALOGS), "Eigene"])], (c) => t(c));
   renderPhrases();
 }
 
-function phraseText(p, lang) {
-  const r = reviews()[p.de + "|" + lang];
-  return { text: r && r.text ? r.text : p[lang], checked: !!r };
-}
-
 // Ein fertiger Satz als Karte oder (im Gespräch) als Sprechblase
-function phraseCard(p, lang, className) {
-  const { text, checked } = phraseText(p, lang);
+function phraseCard(p, lang, className, showCat) {
+  const key = p.de + "|" + lang;
+  const r = reviews()[key];
+  const text = r && r.text ? r.text : p[lang];
+  const verified = lang === "rw" && (p.v || r);
   const card = document.createElement("div");
   card.className = className;
   const meta = document.createElement("small");
-  meta.textContent = lang === "rw" ? t(checked ? "✓ geprüft" : "ungeprüft") : "";
+  meta.textContent = [showCat ? t(p.c) : "", lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : ""].filter(Boolean).join(" · ");
   const src = document.createElement("div");
   src.textContent = p[uiLang];
   const out = document.createElement("strong");
@@ -544,7 +549,7 @@ function phraseCard(p, lang, className) {
   const review = (good, correction) => {
     addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
     const all = reviews();
-    all[p.de + "|" + lang] = { text: correction || p[lang] };
+    all[key] = { text: correction || p[lang] };
     store.set("phrase-review", JSON.stringify(all));
     renderPhrases();
   };
@@ -561,7 +566,19 @@ function phraseCard(p, lang, className) {
     mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
     star,
   );
-  if (lang === "rw") {
+  if (p.own) {
+    row.append(mkBtn("#i-trash", "Phrase löschen", async () => {
+      if (!window.confirm(t("Phrase „{0}“ löschen?", p[uiLang]))) return;
+      try {
+        const res = await fetch("/api/my-phrases/" + p.id, { method: "DELETE", headers: { "X-App-Password": password } });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+      } catch (e) { setStatus(e.message); }
+      loadPhrases();
+    }));
+  } else if (lang === "rw" && !verified) {
+    // Bewertung nur für noch ungeprüfte Sätze, klein hinter einem Knopf
+    const pair = document.createElement("span");
+    pair.hidden = true;
     const up = document.createElement("button");
     up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
     up.onclick = () => review(true, "");
@@ -571,7 +588,11 @@ function phraseCard(p, lang, className) {
       const fix = window.prompt(t("Richtige Übersetzung:"), text);
       if (fix !== null && fix.trim()) review(false, fix.trim());
     };
-    row.append(up, down);
+    pair.append(up, down);
+    const more = document.createElement("button");
+    more.className = "icon"; more.textContent = "⋯"; more.title = t("Prüfen"); more.setAttribute("aria-label", t("Prüfen"));
+    more.onclick = () => { pair.hidden = !pair.hidden; };
+    row.append(more, pair);
   }
   card.append(...(meta.textContent ? [meta] : []), src, out, row);
   return card;
@@ -593,13 +614,22 @@ function dialogCard(title, lines, lang) {
 function renderPhrases() {
   if (!phrases) return;
   const cat = $("ph-cat").value, lang = $("ph-lang").value, favs = loadJson("favs");
+  const q = fold($("ph-search").value);
   store.set("ph-cat", cat);
-  $("ph-lang").hidden = cat === FAVS;
-  $("ph-hint").hidden = cat === FAVS;
-  $("fav-empty").hidden = !(cat === FAVS && !favs.length);
+  $("ph-cat").hidden = !!q;
+  $("ph-lang").hidden = cat === FAVS && !q;
+  $("ph-hint").hidden = cat === FAVS && !q;
+  $("fav-empty").hidden = !(cat === FAVS && !q && !favs.length);
   $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
+  const all = [...phrases, ...myPhrases];
+  if (q) {
+    // Suche: alle Kategorien und alle Sprachen, höchstens 80 Treffer
+    const hits = all.filter((p) => UI_LANGS.some((l) => fold(p[l]).includes(q))).slice(0, 80);
+    $("ph-list").replaceChildren(...hits.map((p) => phraseCard(p, lang, "card fav", true)));
+    return;
+  }
   if (cat === FAVS) { $("ph-list").replaceChildren(...favs.map(favCard)); return; }
-  const list = phrases.filter((p) => p.c === cat);
+  const list = all.filter((p) => p.c === cat);
   // eigene Favoriten dieser Kategorie oben, außer sie stammen selbst aus dem Phrasenbuch (die haben dort den Stern)
   const own = favs.filter((f) => f.cat === cat && !list.some((p) => p[f.source] === f.input));
   let cards;
@@ -612,7 +642,23 @@ function renderPhrases() {
   }
   $("ph-list").replaceChildren(...own.map(favCard), ...cards);
 }
+$("ph-add").onclick = async () => {
+  const text = $("ph-add-text").value.trim();
+  if (!text) return;
+  $("ph-add").disabled = true;
+  setStatus("Übersetze …");
+  try {
+    await api("/api/my-phrases", { text, lang: uiLang, category: $("ph-add-cat").value });
+    $("ph-add-text").value = "";
+    $("ph-add-box").open = false;
+    setStatus("");
+    await loadPhrases();
+    $("ph-cat").value = $("ph-add-cat").value; renderPhrases();
+  } catch (e) { setStatus(e.message); }
+  $("ph-add").disabled = false;
+};
 $("ph-cat").onchange = $("ph-lang").onchange = renderPhrases;
+$("ph-search").oninput = renderPhrases;
 
 // --- Gesprächsmodus: zwei Sprachen, abwechselnd ---
 let who = "a";
@@ -682,49 +728,162 @@ function setLearnMode(mode) {
 $("ph-mode-phrases").onclick = () => setLearnMode("phrases");
 $("ph-mode-learn").onclick = () => setLearnMode("learn");
 
+let learnData = { lists: [], categories: [] };
+let people = [];
+
+function peoplePicker(box, preselected = []) {
+  box.replaceChildren(...(people.length ? people.map((n) => {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = n; cb.checked = preselected.includes(n);
+    label.append(cb, document.createTextNode(n));
+    return label;
+  }) : [Object.assign(document.createElement("small"), { textContent: t("Noch keine anderen Personen angelegt.") })]));
+}
+const pickedPeople = (box) => [...box.querySelectorAll("input:checked")].map((c) => c.value);
+let learnOwn = "all"; // all | mine | others
+
+for (const [key, id] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) {
+  $(id).onclick = () => {
+    learnOwn = key;
+    for (const [k, i] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) $(i).classList.toggle("active", k === key);
+    renderLists();
+  };
+}
+$("learn-cat-filter").onchange = renderLists;
+
+function addWordsForm(l) {
+  const box = document.createElement("div");
+  box.className = "learn-form";
+  box.hidden = true;
+  const ta = document.createElement("textarea");
+  ta.placeholder = t("Eine Zeile pro Wort, z. B. Wasser = amazi");
+  const ok = document.createElement("button");
+  ok.className = "primary"; ok.textContent = t("Hinzufügen");
+  ok.onclick = async () => {
+    const items = parseWordLines(ta.value);
+    if (!items.length) { setStatus("Bereits vorhanden oder leer."); return; }
+    ok.disabled = true;
+    setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
+    try {
+      await api(`/api/lists/${l.id}/items`, { items });
+      setStatus("");
+      loadLists();
+    } catch (e) { setStatus(e.message); }
+    ok.disabled = false;
+  };
+  box.append(ta, ok);
+  return box;
+}
+
+function renderLists() {
+  const cat = $("learn-cat-filter").value;
+  const shown = learnData.lists.filter((l) => (learnOwn === "all" || (learnOwn === "mine") === (l.owner === myName))
+    && (!cat || (l.category || "Sonstiges") === cat));
+  $("learn-empty").textContent = t(learnData.lists.length ? "Keine Listen in dieser Auswahl." : "Noch keine Listen. Lege unten die erste an.");
+  $("learn-empty").hidden = shown.length > 0;
+  $("learn-lists").replaceChildren(...shown.map((l) => {
+    const card = document.createElement("div");
+    card.className = "card fav";
+    const meta = document.createElement("small");
+    const mine = l.owner === myName;
+    meta.textContent = `${mine ? (l.to && l.to.length ? t("An: {0}", l.to.join(", ")) : t("Meine")) : t("Von {0}", l.owner)} · ${t(l.category || "Sonstiges")} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
+    const title = document.createElement("strong");
+    title.textContent = l.title;
+    const row = document.createElement("div");
+    row.className = "fav-actions learn-actions";
+    const start = document.createElement("button");
+    start.className = "primary"; start.textContent = t("Test starten");
+    start.onclick = () => startQuiz(l);
+    row.append(mkBtn("#i-book", "Lernen mit Karten", () => startCards(l)), start);
+    card.append(meta, title, row);
+    if (!mine && l.to && l.to.includes(myName)) {
+      row.append(mkBtn("#i-trash", "Liste aus meiner Ansicht entfernen", async () => {
+        if (!window.confirm(t("Liste „{0}“ entfernen?", l.title))) return;
+        try { await api(`/api/lists/${l.id}/leave`, {}); } catch (e) { setStatus(e.message); }
+        loadLists();
+      }));
+    }
+    if (myAdmin || mine) {
+      const sendBox = document.createElement("div");
+      sendBox.className = "learn-form"; sendBox.hidden = true;
+      const picker = document.createElement("fieldset");
+      picker.className = "people";
+      const pk = document.createElement("div");
+      picker.append(Object.assign(document.createElement("legend"), { textContent: t("Senden an") }), pk);
+      const go = document.createElement("button");
+      go.className = "primary"; go.textContent = t("Senden");
+      go.onclick = async () => {
+        const names = pickedPeople(pk);
+        if (!names.length) return;
+        go.disabled = true;
+        try {
+          await api(`/api/lists/${l.id}/share`, { to: names });
+          setStatus(t("Gesendet an {0}.", names.join(", ")));
+          loadLists();
+        } catch (e) { setStatus(e.message); }
+        go.disabled = false;
+      };
+      sendBox.append(picker, go);
+      row.append(mkBtn("#i-chat", "Liste senden", () => { peoplePicker(pk, l.to || []); sendBox.hidden = !sendBox.hidden; }));
+      card.append(sendBox);
+    }
+    if (myAdmin || mine) {
+      const form = addWordsForm(l);
+      row.append(mkBtn("#i-plus", "Wörter hinzufügen", () => { form.hidden = !form.hidden; }));
+      row.append(mkBtn("#i-book", "In meine Phrasen übernehmen", async () => {
+        setStatus("Übersetze …");
+        try {
+          const r = await api("/api/my-phrases/from-list", { list_id: l.id });
+          setStatus(t("{0} Phrasen übernommen.", r.added));
+        } catch (e) { setStatus(e.message); }
+      }));
+      row.append(mkBtn("#i-trash", "Liste löschen", async () => {
+        if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
+        try {
+          const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+        } catch (e) { setStatus(e.message); }
+        loadLists();
+      }));
+      card.append(form);
+    }
+    return card;
+  }));
+}
+
 async function loadLists() {
   try {
-    const r = await api("/api/lists");
-    $("learn-empty").hidden = r.lists.length > 0;
-    $("learn-lists").replaceChildren(...r.lists.map((l) => {
-      const card = document.createElement("div");
-      card.className = "card fav";
-      const meta = document.createElement("small");
-      meta.textContent = `${l.owner} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
-      const title = document.createElement("strong");
-      title.textContent = l.title;
-      const row = document.createElement("div");
-      row.className = "fav-actions learn-actions";
-      const start = document.createElement("button");
-      start.className = "primary"; start.textContent = t("Üben");
-      start.onclick = () => startQuiz(l);
-      row.append(start);
-      if (myAdmin || l.owner === myName) {
-        row.append(mkBtn("#i-trash", "Liste löschen", async () => {
-          if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
-          try {
-            const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
-            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
-          } catch (e) { setStatus(e.message); }
-          loadLists();
-        }));
-      }
-      card.append(meta, title, row);
-      return card;
-    }));
+    learnData = await api("/api/lists");
+    try { people = (await api("/api/people")).people; } catch { people = []; }
+    peoplePicker($("learn-to"), pickedPeople($("learn-to")));
+    const fill2 = (sel, first) => {
+      const keep = sel.value;
+      sel.replaceChildren(...[...(first ? [["", t("Alle Kategorien")]] : []), ...learnData.categories.map((c) => [c, t(c)])].map(([v, label]) => {
+        const o = document.createElement("option"); o.value = v; o.textContent = label; return o;
+      }));
+      if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    };
+    fill2($("learn-cat-filter"), true);
+    fill2($("learn-cat"), false);
+    renderLists();
   } catch (e) { setStatus(e.message); }
 }
 
-$("learn-save").onclick = async () => {
-  const items = $("learn-items").value.split("\n").map((line) => {
+function parseWordLines(text) {
+  return text.split("\n").map((line) => {
     const [a, ...rest] = line.split("=");
     return { a: a.trim(), b: rest.join("=").trim() };
   }).filter((i) => i.a);
+}
+
+$("learn-save").onclick = async () => {
+  const items = parseWordLines($("learn-items").value);
   if (!$("learn-title").value.trim() || !items.length) { setStatus("Titel und mindestens ein Wort nötig."); return; }
   $("learn-save").disabled = true;
   setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
   try {
-    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, items });
+    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, category: $("learn-cat").value, to: pickedPeople($("learn-to")), items });
     $("learn-title").value = ""; $("learn-items").value = "";
     $("learn-new").open = false;
     setStatus("");
@@ -734,6 +893,40 @@ $("learn-save").onclick = async () => {
 };
 
 const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+// --- Lernkarten: Wort anzeigen, umdrehen, „gewusst“ oder „nochmal“ ---
+let deck = null;
+
+function startCards(list) {
+  deck = { list, queue: shuffle(list.items.map((it) => ({ front: it.a, back: it.b }))), total: list.items.length, known: 0, flipped: false };
+  $("learn-home").hidden = true;
+  $("cards").hidden = false;
+  showCard();
+}
+
+function showCard() {
+  if (!deck.queue.length) {
+    $("cards-progress").textContent = t("Fertig");
+    $("cards-face").textContent = t("Alle Karten gelernt, super!");
+    $("cards-face").disabled = true; $("cards-hint").hidden = true; $("cards-answers").hidden = true;
+    return;
+  }
+  const c = deck.queue[0];
+  deck.flipped = false;
+  $("cards-progress").textContent = `${deck.known} / ${deck.total}`;
+  $("cards-face").textContent = c.front;
+  $("cards-face").disabled = false; $("cards-hint").hidden = false; $("cards-answers").hidden = true;
+}
+
+$("cards-face").onclick = () => {
+  const c = deck.queue[0];
+  deck.flipped = !deck.flipped;
+  $("cards-face").textContent = deck.flipped ? c.back : c.front;
+  $("cards-hint").hidden = deck.flipped; $("cards-answers").hidden = !deck.flipped;
+};
+$("cards-known").onclick = () => { deck.queue.shift(); deck.known++; showCard(); };
+$("cards-again").onclick = () => { deck.queue.push(deck.queue.shift()); showCard(); };
+$("cards-stop").onclick = () => { $("cards").hidden = true; $("learn-home").hidden = false; };
+
 let quiz = null;
 
 function shuffle(a) {

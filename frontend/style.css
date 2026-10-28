@@ -213,3 +213,11 @@ footer { text-align: center; }
 body.typing .tabbar { display: none; }
 .dialog { display: grid; gap: 8px; }
 .dialog h3 { margin: 8px 4px 0; font-size: 1rem; color: var(--muted); }
+
+.search { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; min-height: 46px; margin-bottom: 8px; }
+
+.people { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin: 0; }
+.people legend { color: var(--muted); font-size: .9rem; padding: 0 4px; }
+.people label { display: flex; gap: 10px; align-items: center; min-height: 40px; }
+.people input { width: 20px; height: 20px; }
+.card-face { width: 100%; min-height: 140px; border-radius: 14px; background: var(--chip); }

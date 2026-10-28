@@ -28,6 +28,7 @@
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5ZM12 6.500v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3m-7 0 1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
@@ -146,6 +147,7 @@
         <button id="ph-mode-learn">Lernen</button>
       </div>
       <div id="ph-phrases" class="view">
+      <input id="ph-search" type="search" class="search" placeholder="Wörterbuch durchsuchen (alle Sprachen)" aria-label="Suchen" autocomplete="off" autocapitalize="off">
       <div class="langbar">
         <select id="ph-cat" aria-label="Kategorie"></select>
         <select id="ph-lang" aria-label="Sprache"></select>
@@ -153,10 +155,24 @@
       <p id="ph-hint" class="hint">Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.</p>
       <div id="ph-list" class="fav-list"></div>
       <p id="fav-empty" class="empty" hidden>Noch keine Favoriten. Beim Übersetzen oder bei einem Satz den Stern drücken.</p>
+      <details id="ph-add-box" class="card">
+        <summary>Eigene Phrase hinzufügen</summary>
+        <div class="learn-form">
+          <input id="ph-add-text" type="text" maxlength="200" placeholder="Text in deiner App-Sprache" aria-label="Phrase">
+          <select id="ph-add-cat" aria-label="Kategorie"></select>
+          <button id="ph-add" class="primary">Hinzufügen</button>
+        </div>
+      </details>
     </div>
 
       <div id="ph-learn" class="view" hidden>
         <div id="learn-home" class="view">
+          <div class="seg" role="group" aria-label="Listen">
+            <button id="learn-own-all" class="active">Alle</button>
+            <button id="learn-own-mine">Meine</button>
+            <button id="learn-own-others">Von anderen</button>
+          </div>
+          <div class="langbar"><select id="learn-cat-filter" aria-label="Kategorie"></select></div>
           <div id="learn-lists" class="fav-list"></div>
           <p id="learn-empty" class="empty">Noch keine Listen. Lege unten die erste an.</p>
           <details class="card" id="learn-new">
@@ -168,10 +184,22 @@
                 <span>→</span>
                 <select id="learn-tgt" aria-label="Nach"></select>
               </div>
+              <select id="learn-cat" aria-label="Kategorie"></select>
+              <fieldset class="people"><legend>Senden an</legend><div id="learn-to"></div></fieldset>
               <textarea id="learn-items" placeholder="Eine Zeile pro Wort:&#10;Wasser = amazi&#10;Brot&#10;(ohne „=“ wird automatisch übersetzt)" aria-label="Wörter"></textarea>
               <button id="learn-save" class="primary">Liste speichern</button>
             </div>
           </details>
+        </div>
+
+        <div id="cards" class="card quiz" hidden>
+          <div class="quiz-top"><small id="cards-progress"></small><button id="cards-stop" class="ghost">Beenden</button></div>
+          <button id="cards-face" class="quiz-q card-face" aria-live="polite"></button>
+          <small id="cards-hint" class="hint">Antippen zum Umdrehen</small>
+          <div id="cards-answers" class="rate" hidden>
+            <button id="cards-again" class="ghost">Nochmal</button>
+            <button id="cards-known" class="primary">Gewusst</button>
+          </div>
         </div>
 
         <div id="quiz" class="card quiz" hidden>
