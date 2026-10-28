@@ -1,10 +1,11 @@
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import cache, currency, lists, ocr, rooms, tts, userphrases, users
+from . import cache, chats, currency, lists, ocr, tts, userphrases, users
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -60,15 +61,15 @@ class PhrasesFromList(BaseModel):
     list_id: str
 
 
-class RoomJoin(BaseModel):
-    cid: str
+class NewChat(BaseModel):
+    title: str = ""
+    members: list[str]
+
+
+class ChatMessage(BaseModel):
     lang: str
-    code: str | None = None  # leer = neuen Raum erstellen
-
-
-class RoomMessage(BaseModel):
-    cid: str
-    text: str
+    text: str = ""
+    image: str = ""  # JPEG als Base64 ohne "data:"-Präfix
 
 
 class TranslateRequest(BaseModel):
@@ -330,45 +331,55 @@ def my_phrases_delete(phrase_id: str, user: users.User = Depends(require_passwor
     return {"ok": True}
 
 
-def _room_call(fn, *args):
+def _chat_call(fn, *args):
     try:
         return fn(*args)
-    except rooms.RoomError as exc:
-        raise HTTPException(404, str(exc))
+    except chats.ChatError as exc:
+        msg = str(exc)
+        raise HTTPException(404 if "nicht gefunden" in msg else 400, msg)
 
 
-@app.post("/api/rooms")
-def room_enter(req: RoomJoin, user: users.User = Depends(require_password)):
-    if req.lang not in LANGUAGES or not 8 <= len(req.cid) <= 64:
-        raise HTTPException(400, "Ungültige Anfrage")
-    if req.code:
-        room = _room_call(rooms.join, req.code, req.cid, user.name, req.lang)
-    else:
-        room = _room_call(rooms.create, req.cid, user.name, req.lang)
-    return {"room": room.code}
+@app.get("/api/chats")
+def chat_list(user: users.User = Depends(require_password)):
+    return {"chats": chats.mine(user.name)}
 
 
-@app.post("/api/rooms/{code}/messages", dependencies=[Depends(require_password)])
-def room_post(code: str, req: RoomMessage):
+@app.post("/api/chats")
+def chat_create(req: NewChat, user: users.User = Depends(require_password)):
+    return _chat_call(chats.create, user.name, req.title, _known_recipients(req.members, user.name))
+
+
+@app.post("/api/chats/{chat_id}/messages")
+def chat_post(chat_id: str, req: ChatMessage, user: users.User = Depends(require_password)):
     text = req.text.strip()
-    if not text:
+    if not text and not req.image:
         raise HTTPException(400, "Kein Text")
     if len(text) > max_input_chars():
         raise HTTPException(413, f"Text zu lang (max. {max_input_chars()} Zeichen)")
-    room = _room_call(rooms.get, code)
-    msg = _room_call(rooms.post, room, req.cid, text)
+    if req.lang not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    if len(req.image) > ocr.MAX_IMAGE_BASE64:
+        raise HTTPException(413, "Bild fehlt oder ist zu groß")
+    msg = _chat_call(chats.post, chat_id, user.name, req.lang, text, req.image)
     return {"id": msg["id"]}
 
 
-@app.get("/api/rooms/{code}/messages", dependencies=[Depends(require_password)])
-def room_fetch(code: str, cid: str, after: int = 0):
-    room = _room_call(rooms.get, code)
-    return _room_call(rooms.fetch, room, cid, after, lambda t, s_, g: translate_text(t, s_, g)[0])
+@app.get("/api/chats/{chat_id}/messages")
+def chat_fetch(chat_id: str, lang: str, after: int = 0, user: users.User = Depends(require_password)):
+    if lang not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    return _chat_call(chats.fetch, chat_id, user.name, lang, after, lambda t, s_, g: translate_text(t, s_, g)[0])
 
 
-@app.delete("/api/rooms/{code}", dependencies=[Depends(require_password)])
-def room_leave(code: str, cid: str):
-    rooms.leave(code, cid)
+@app.get("/api/chats/{chat_id}/images/{file}")
+def chat_image(chat_id: str, file: str, user: users.User = Depends(require_password)):
+    path = _chat_call(chats.image_path, chat_id, user.name, file)
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=31536000"})
+
+
+@app.delete("/api/chats/{chat_id}")
+def chat_leave(chat_id: str, user: users.User = Depends(require_password)):
+    _chat_call(chats.leave, chat_id, user.name)
     return {"ok": True}
 
 

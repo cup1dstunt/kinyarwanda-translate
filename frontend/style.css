@@ -152,7 +152,7 @@ footer { text-align: center; }
 }
 
 /* Favoriten, Bewertung, Gespräch, Preisschild, Großanzeige */
-.pane-actions .icon.on { color: #e0a800; }
+.pane-actions .icon.on, .fav-actions .icon.on { color: #e0a800; }
 .rate { display: flex; gap: 8px; padding: 10px; align-items: center; }
 .rate input { flex: 1; min-width: 0; min-height: 46px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
 .empty { color: var(--muted); text-align: center; }
@@ -185,11 +185,8 @@ footer { text-align: center; }
 
 .hint { margin: 0; color: var(--muted); font-size: .9rem; }
 .room-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; margin-bottom: 10px; }
-.room-code { font-size: 2rem; font-weight: 800; letter-spacing: .18em; }
 #chat-room .seg { padding: 0; }
 #chat > .seg { padding: 0; }
-#room-join { gap: 10px; }
-#room-code { min-height: 46px; padding: 0 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); text-transform: uppercase; letter-spacing: .15em; }
 
 #phrases > .seg { padding: 0; }
 .learn-form { display: grid; gap: 10px; padding-bottom: 14px; }
@@ -211,6 +208,8 @@ footer { text-align: center; }
 
 /* iOS-Tastatur: Tab-Leiste weg, solange ein Feld fokussiert ist */
 body.typing .tabbar { display: none; }
+.dialog { display: grid; gap: 8px; }
+.dialog h3 { margin: 8px 4px 0; font-size: 1rem; color: var(--muted); }
 
 .search { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 12px; min-height: 46px; margin-bottom: 8px; }
 
@@ -219,3 +218,16 @@ body.typing .tabbar { display: none; }
 .people label { display: flex; gap: 10px; align-items: center; min-height: 40px; }
 .people input { width: 20px; height: 20px; }
 .card-face { width: 100%; min-height: 140px; border-radius: 14px; background: var(--chip); }
+
+/* Chats */
+.chat-item { width: 100%; text-align: left; color: inherit; font: inherit; padding-bottom: 12px; cursor: pointer; }
+.chat-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.badge { min-width: 22px; padding: 1px 7px; border-radius: 11px; background: var(--accent); color: var(--accent-text); font-size: .8rem; font-weight: 700; text-align: center; }
+.tabbar button { position: relative; }
+.tab-badge { position: absolute; top: 2px; left: calc(50% + 6px); min-width: 18px; padding: 0 5px; border-radius: 9px; background: #e5484d; color: #fff; font-size: 11px; line-height: 18px; }
+.room-info { flex: 1; min-width: 0; display: grid; }
+.room-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#room-back { font-size: 1.6rem; padding: 0 10px; }
+.chat-img { display: block; max-width: 100%; max-height: 320px; border-radius: 12px; margin: 6px 0; cursor: zoom-in; }
+.img-zoom { background: #000; }
+.img-zoom img { max-width: 100%; max-height: 100%; object-fit: contain; }

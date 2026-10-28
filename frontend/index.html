@@ -27,6 +27,7 @@
   <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7l-4.5 3.5V17H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 4 5v13c3-.5 6 0 8 1.5 2-1.5 5-2 8-1.5V5c-3-.5-6 0-8 1.5ZM12 6.500v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3m-7 0 1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
@@ -95,7 +96,7 @@
     <section id="chat" class="view" hidden>
       <div class="seg" role="group" aria-label="Modus">
         <button id="mode-local" class="active">Ein Gerät</button>
-        <button id="mode-room">Zwei Handys</button>
+        <button id="mode-room">Chats</button>
       </div>
       <div id="chat-local" class="view">
       <div class="langbar">
@@ -119,22 +120,36 @@
     </div>
 
       <div id="chat-room" class="view" hidden>
-        <div id="room-join" class="card cur">
-          <label for="room-lang"><small>Ich schreibe auf</small></label>
-          <select id="room-lang"></select>
-          <button id="room-create" class="primary big">Neuen Raum erstellen</button>
-          <input id="room-code" type="text" placeholder="Raum-Code eingeben" autocapitalize="characters" autocomplete="off" maxlength="5" aria-label="Raum-Code">
-          <button id="room-enter" class="primary">Beitreten</button>
+        <div id="chats-home" class="view">
+          <div class="card cur">
+            <label for="room-lang"><small>Ich schreibe und lese auf</small></label>
+            <select id="room-lang"></select>
+          </div>
+          <div id="chats-list" class="fav-list"></div>
+          <p id="chats-empty" class="empty">Noch keine Chats. Lege unten den ersten an.</p>
+          <details id="chat-new" class="card">
+            <summary>Neuer Chat</summary>
+            <div class="learn-form">
+              <input id="chat-title" type="text" maxlength="40" placeholder="Name, z. B. Familie (optional)" aria-label="Name des Chats">
+              <fieldset class="people"><legend>Mit wem?</legend><div id="chat-people"></div></fieldset>
+              <button id="chat-create" class="primary">Chat erstellen</button>
+            </div>
+          </details>
         </div>
         <div id="room-live" hidden>
           <div class="card room-head">
-            <div><small>Raum-Code (weitergeben)</small><div id="room-title" class="room-code"></div><small id="room-members"></small></div>
+            <button id="room-back" class="ghost" aria-label="Zurück zu den Chats">‹</button>
+            <div class="room-info"><strong id="room-title"></strong><small id="room-members"></small></div>
             <button id="room-leave" class="ghost">Verlassen</button>
           </div>
           <div id="room-log" class="chat-log" aria-live="polite"></div>
           <div class="card chat-input">
             <textarea id="room-text" placeholder="Nachricht eingeben oder diktieren" maxlength="2000" aria-label="Nachricht"></textarea>
-            <div class="pane-actions"><span class="spacer"></span><button id="room-send" class="primary">Senden</button></div>
+            <div class="pane-actions">
+              <label id="room-photo" class="icon" title="Foto senden" aria-label="Foto senden"><svg><use href="#i-camera"/></svg><input id="room-file" type="file" accept="image/*" hidden></label>
+              <span class="spacer"></span>
+              <button id="room-send" class="primary">Senden</button>
+            </div>
           </div>
         </div>
       </div>
@@ -153,6 +168,7 @@
       </div>
       <p id="ph-hint" class="hint">Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.</p>
       <div id="ph-list" class="fav-list"></div>
+      <p id="fav-empty" class="empty" hidden>Noch keine Favoriten. Beim Übersetzen oder bei einem Satz den Stern drücken.</p>
       <details id="ph-add-box" class="card">
         <summary>Eigene Phrase hinzufügen</summary>
         <div class="learn-form">
@@ -214,16 +230,11 @@
       </div>
     </section>
 
-    <section id="favs" class="view" hidden>
+    <section id="settings" class="view" hidden>
       <div class="card cur settings">
         <label for="ui-lang"><small>Sprache der App</small></label>
         <select id="ui-lang"></select>
       </div>
-      <div class="langbar">
-        <select id="fav-filter" aria-label="Kategorie"></select>
-      </div>
-      <div id="fav-list" class="fav-list"></div>
-      <p id="fav-empty" class="empty">Noch keine Favoriten. Beim Übersetzen den Stern drücken.</p>
       <details class="card">
         <summary><span>Bewertungen</span> (<span id="rate-count">0</span>)</summary>
         <p><small>Rückmeldungen der Muttersprachlerin zur Übersetzungsqualität. Exportieren und in docs/TESTERGEBNISSE.md einfügen.</small></p>
@@ -263,12 +274,13 @@
 
   <nav class="tabbar" id="tabbar" hidden>
     <button id="tab-translate" class="active"><svg><use href="#i-translate"/></svg><span>Übersetzen</span></button>
-    <button id="tab-chat"><svg><use href="#i-chat"/></svg><span>Gespräch</span></button>
+    <button id="tab-chat"><svg><use href="#i-chat"/></svg><span>Gespräch</span><b id="chat-badge" class="tab-badge" hidden></b></button>
     <button id="tab-phrases"><svg><use href="#i-book"/></svg><span>Phrasen</span></button>
-    <button id="tab-favs"><svg><use href="#i-star"/></svg><span>Favoriten/Einstellungen</span></button>
+    <button id="tab-settings"><svg><use href="#i-gear"/></svg><span>Einstellungen</span></button>
     <button id="tab-currency"><svg><use href="#i-coins"/></svg><span>Währung</span></button>
   </nav>
 </div>
+<div id="img-zoom" class="zoom img-zoom" hidden role="dialog" aria-label="Foto"><img id="img-zoom-pic" alt=""></div>
 <div id="zoom" class="zoom" hidden role="dialog" aria-label="Großanzeige"><p id="zoom-text"></p><small>Tippen zum Schließen</small></div>
 <script src="i18n.js"></script>
 <script src="app.js"></script>

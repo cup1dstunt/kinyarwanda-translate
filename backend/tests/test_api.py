@@ -192,7 +192,13 @@ def test_translation_cache(web, monkeypatch):
     assert second["cached"] is True and calls == ["Hallo"]
 
 
-def test_room_chat_translates_per_reader(web, monkeypatch):
+def _two_people(web):
+    anna = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    ben = web.post("/api/admin/users", headers=H, json={"name": "Ben"}).json()["code"]
+    return {"X-App-Password": anna}, {"X-App-Password": ben}
+
+
+def test_chat_translates_per_reader(web, monkeypatch):
     calls = []
 
     class Fake:
@@ -201,26 +207,69 @@ def test_room_chat_translates_per_reader(web, monkeypatch):
             return f"[{target}] {text}"
 
     monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
-    a, b = "a" * 12, "b" * 12
-    code = web.post("/api/rooms", headers=H, json={"cid": a, "lang": "de"}).json()["room"]
-    assert web.post("/api/rooms", headers=H, json={"cid": b, "lang": "rw", "code": code.lower()}).status_code == 200
-    assert web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "Hallo"}).status_code == 200
-    got = web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H).json()
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"title": "Familie", "members": ["Ben"]}).json()
+    assert [m["name"] for m in chat["members"]] == ["Anna", "Ben"]
+    url = f"/api/chats/{chat['id']}/messages"
+    assert web.post(url, headers=ha, json={"lang": "de", "text": "Hallo"}).status_code == 200
+    listed = web.get("/api/chats", headers=hb).json()["chats"]
+    assert listed[0]["title"] == "Familie" and listed[0]["unread"] == 1 and listed[0]["last"]["text"] == "Hallo"
+    got = web.get(url, params={"lang": "rw"}, headers=hb).json()
     assert got["messages"][0]["text"] == "[rw] Hallo" and got["messages"][0]["original"] == "Hallo"
-    mine = web.get(f"/api/rooms/{code}/messages", params={"cid": a}, headers=H).json()["messages"][0]
+    assert got["messages"][0]["mine"] is False
+    assert web.get("/api/chats", headers=hb).json()["chats"][0]["unread"] == 0
+    mine = web.get(url, params={"lang": "de"}, headers=ha).json()["messages"][0]
     assert mine["mine"] is True and mine["text"] == "Hallo"
-    web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H)
+    web.get(url, params={"lang": "rw"}, headers=hb)
     assert calls == [("Hallo", "rw")]  # nur einmal übersetzt
-    later = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()
-    assert later["messages"] == [] and len(later["members"]) == 2
+    assert web.get(url, params={"lang": "rw", "after": 1}, headers=hb).json()["messages"] == []
 
 
-def test_room_errors(web):
-    assert web.post("/api/rooms", headers=H, json={"cid": "c" * 12, "lang": "de", "code": "NOPE1"}).status_code == 404
-    assert web.post("/api/rooms", json={"cid": "c" * 12, "lang": "de"}).status_code == 401
-    code = web.post("/api/rooms", headers=H, json={"cid": "a" * 12, "lang": "de"}).json()["room"]
-    r = web.get(f"/api/rooms/{code}/messages", params={"cid": "z" * 12}, headers=H)
-    assert r.status_code == 404
+def test_chat_survives_restart(web, monkeypatch):
+    from backend import chats
+
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    web.post(f"/api/chats/{chat['id']}/messages", headers=ha, json={"lang": "de", "text": "Bis morgen"})
+    monkeypatch.setattr(chats, "_loaded_from", None)  # wie ein Neustart: von der Platte lesen
+    msgs = web.get(f"/api/chats/{chat['id']}/messages", params={"lang": "de"}, headers=hb).json()["messages"]
+    assert msgs[0]["text"] == "Bis morgen"
+
+
+def test_chat_images(web):
+    import base64
+
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    jpeg = b"\xff\xd8\xff\xe0" + b"0" * 100
+    assert web.post(url, headers=ha, json={"lang": "de", "image": base64.b64encode(jpeg).decode()}).status_code == 200
+    msg = web.get(url, params={"lang": "rw"}, headers=hb).json()["messages"][0]
+    assert msg["image"] and msg["text"] == ""
+    img = web.get(f"/api/chats/{chat['id']}/images/{msg['image']}", headers=hb)
+    assert img.status_code == 200 and img.content == jpeg
+    assert web.get(f"/api/chats/{chat['id']}/images/{msg['image']}").status_code == 401
+    assert web.get(f"/api/chats/{chat['id']}/images/{msg['image']}", headers=H).status_code == 404  # nicht Mitglied
+    assert web.get(f"/api/chats/{chat['id']}/images/..%2Fx.json", headers=hb).status_code == 404
+    png = base64.b64encode(b"\x89PNG" + b"0" * 10).decode()
+    assert web.post(url, headers=ha, json={"lang": "de", "image": png}).status_code == 400
+    assert web.post(url, headers=ha, json={"lang": "de"}).status_code == 400
+
+
+def test_chat_errors_and_leave(web):
+    ha, hb = _two_people(web)
+    assert web.post("/api/chats", headers=ha, json={"members": []}).status_code == 400
+    assert web.post("/api/chats", headers=ha, json={"members": ["Niemand"]}).status_code == 400
+    assert web.post("/api/chats", json={"members": ["Ben"]}).status_code == 401
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    assert web.get(url, params={"lang": "de"}, headers=H).status_code == 404  # Admin ist nicht im Chat
+    assert web.get("/api/chats/nope/messages", params={"lang": "de"}, headers=ha).status_code == 404
+    assert web.delete(f"/api/chats/{chat['id']}", headers=ha).status_code == 200
+    assert web.get("/api/chats", headers=ha).json()["chats"] == []
+    assert len(web.get("/api/chats", headers=hb).json()["chats"]) == 1
+    assert web.delete(f"/api/chats/{chat['id']}", headers=hb).status_code == 200
+    assert web.get(url, params={"lang": "de"}, headers=hb).status_code == 404
 
 
 def test_vocab_lists(web, monkeypatch):
@@ -322,7 +371,7 @@ def test_i18n_covers_html_and_server_messages():
 
     main = (root / "backend" / "main.py").read_text(encoding="utf-8")
     messages = re.findall(r'HTTPException\(\d+, "([^"{]+)"\)', main)
-    messages += re.findall(r'raise RoomError\("([^"{]+)"\)', (root / "backend" / "rooms.py").read_text(encoding="utf-8"))
+    messages += re.findall(r'raise ChatError\("([^"{]+)"\)', (root / "backend" / "chats.py").read_text(encoding="utf-8"))
     assert [m for m in messages if m not in entries] == []
 
 

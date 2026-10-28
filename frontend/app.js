@@ -33,9 +33,10 @@ function fill(select, values, label = (v) => v) {
   }));
 }
 
-const TABS = { translate: "translate", chat: "chat", phrases: "phrases", favs: "favs", currency: "currency" };
+const TABS = { translate: "translate", chat: "chat", phrases: "phrases", settings: "settings", currency: "currency" };
 
 function showLogin() {
+  stopPolling();
   $("login").hidden = false; $("tabbar").hidden = true;
   for (const v of Object.values(TABS)) $(v).hidden = true;
 }
@@ -47,10 +48,9 @@ function showTab(name) {
     $(view).hidden = tab !== name;
     $("tab-" + tab).classList.toggle("active", tab === name);
   }
-  if (name === "favs") renderFavs();
+  if (name === "settings") $("rate-count").textContent = loadJson("ratings").length;
   if (name === "phrases") loadPhrases();
-  if (name === "chat" && room && !$("chat-room").hidden) startPolling();
-  if (name !== "chat") stopPolling();
+  startPolling();
   setStatus("");
 }
 
@@ -75,7 +75,8 @@ async function init() {
     myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
     $("room-lang").value = store.get("room-lang") || uiLang;
-    resumeRoom();
+    if (store.get("chat-mode") === "room") setMode("room");
+    startPolling();
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
     fill($("conv-b"), info.languages, (l) => LANG_LABELS[l]);
     $("conv-a").value = uiLang; $("conv-b").value = uiLang === "rw" ? "de" : "rw";
@@ -94,7 +95,7 @@ $("password").onkeydown = (e) => { if (e.key === "Enter") $("login-btn").click()
 $("tab-translate").onclick = () => showTab("translate");
 $("tab-currency").onclick = () => showTab("currency");
 $("tab-chat").onclick = () => showTab("chat");
-$("tab-favs").onclick = () => showTab("favs");
+$("tab-settings").onclick = () => showTab("settings");
 $("tab-phrases").onclick = () => showTab("phrases");
 
 async function translate() {
@@ -235,12 +236,12 @@ if (synth) synth.onvoiceschanged = updateControls;
 // --- Texterkennung (Foto eines Schilds → Text → Übersetzung) ---
 const OCR_MAX_SIDE = 1600; // reicht für Schilder, hält Upload und Kosten klein
 
-function imageToBase64(file) {
+function imageToBase64(file, maxSide = OCR_MAX_SIDE) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const scale = Math.min(1, OCR_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
@@ -363,7 +364,7 @@ $("zoom").onclick = () => { $("zoom").hidden = true; };
 $("show").onclick = () => zoom($("output").value);
 
 // --- Favoriten / Phrasebook (lokal, auch offline nutzbar) ---
-const CATEGORIES = ["Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
+const CATEGORIES = ["Alltagssprache", "Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
 
 function loadJson(key) {
   try { return JSON.parse(store.get(key) || "[]"); } catch { return []; }
@@ -389,39 +390,31 @@ $("fav").onclick = () => {
   setTimeout(() => $("fav").classList.remove("on"), 1500);
 };
 
-function renderFavs() {
-  const all = loadJson("favs");
-  const cats = [...new Set([...CATEGORIES, ...all.map((f) => f.cat)])];
-  const current = $("fav-filter").value || "";
-  fill($("fav-filter"), ["", ...cats], (c) => t(c || "Alle Kategorien"));
-  $("fav-filter").value = cats.includes(current) ? current : "";
-  const shown = all.filter((f) => !$("fav-filter").value || f.cat === $("fav-filter").value);
-  $("fav-empty").hidden = shown.length > 0;
-  $("fav-list").replaceChildren(...shown.map((f) => {
-    const card = document.createElement("div");
-    card.className = "card fav";
-    const meta = document.createElement("small");
-    meta.textContent = `${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
-    const inp = document.createElement("div");
-    inp.textContent = f.input;
-    const out = document.createElement("strong");
-    out.textContent = f.output;
-    const row = document.createElement("div");
-    row.className = "fav-actions";
-    row.append(
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
-      mkBtn("#i-trash", "Löschen", () => {
-        store.set("favs", JSON.stringify(loadJson("favs").filter((x) => favId(x) !== favId(f))));
-        renderFavs();
-      }),
-    );
-    card.append(meta, inp, out, row);
-    return card;
-  }));
-  $("rate-count").textContent = loadJson("ratings").length;
+function setFavs(list) { store.set("favs", JSON.stringify(list)); }
+
+// Karte für einen eigenen Favoriten (im Phrasen-Tab angezeigt)
+function favCard(f) {
+  const card = document.createElement("div");
+  card.className = "card fav";
+  const meta = document.createElement("small");
+  meta.textContent = `★ ${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
+  const inp = document.createElement("div");
+  inp.textContent = f.input;
+  const out = document.createElement("strong");
+  out.textContent = f.output;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  row.append(
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
+    mkBtn("#i-trash", "Löschen", () => {
+      setFavs(loadJson("favs").filter((x) => favId(x) !== favId(f)));
+      renderPhrases();
+    }),
+  );
+  card.append(meta, inp, out, row);
+  return card;
 }
-$("fav-filter").onchange = renderFavs;
 
 // --- Zugänge (nur Admin) ---
 async function renderAdmin() {
@@ -507,13 +500,16 @@ $("rate-export").onclick = async () => {
   }
 };
 $("rate-clear").onclick = () => {
-  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); renderFavs(); }
+  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); $("rate-count").textContent = "0"; }
 };
 
 // --- Phrasenbuch: fertige Sätze, Kinyarwanda ungeprüft bis zur Bestätigung ---
 let phrases = null;
 const fold = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{}"); } catch { return {}; } };
+
+const FAVS = "__favs", DIALOGS = "Gespräche";
+let myPhrases = [];
 
 async function loadPhrases() {
   if (!phrases) {
@@ -526,84 +522,126 @@ async function loadPhrases() {
     $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
   }
   try { myPhrases = (await api("/api/my-phrases")).phrases.map((p) => ({ ...p, own: true })); } catch { myPhrases = []; }
-  const cats = [...new Set([...phrases.map((p) => p.c), ...myPhrases.map((p) => p.c)])];
-  const keep = $("ph-cat").value;
-  fill($("ph-cat"), cats, (c) => t(c));
-  if (cats.includes(keep)) $("ph-cat").value = keep;
-  fill($("ph-add-cat"), [...new Set([...cats, "Eigene"])], (c) => t(c));
+  // Kategorien jedes Mal neu, weil eigene Phrasen und Favoriten neue Kategorien mitbringen können
+  const cats = [...new Set([...phrases.map((p) => p.c), ...myPhrases.map((p) => p.c), ...loadJson("favs").map((f) => f.cat)])];
+  const current = $("ph-cat").value || store.get("ph-cat") || (loadJson("favs").length ? FAVS : DIALOGS);
+  fill($("ph-cat"), [FAVS, ...cats], (c) => (c === FAVS ? "★ " + t("Favoriten") : t(c)));
+  $("ph-cat").value = [FAVS, ...cats].includes(current) ? current : DIALOGS;
+  fill($("ph-add-cat"), [...new Set([...cats.filter((c) => c !== DIALOGS), "Eigene"])], (c) => t(c));
   renderPhrases();
 }
 
-let myPhrases = [];
+// Ein fertiger Satz als Karte oder (im Gespräch) als Sprechblase
+function phraseCard(p, lang, className, showCat) {
+  const key = p.de + "|" + lang;
+  const r = reviews()[key];
+  const text = r && r.text ? r.text : p[lang];
+  const verified = lang === "rw" && (p.v || r);
+  const card = document.createElement("div");
+  card.className = className;
+  const meta = document.createElement("small");
+  meta.textContent = [showCat ? t(p.c) : "", lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : ""].filter(Boolean).join(" · ");
+  const src = document.createElement("div");
+  src.textContent = p[uiLang];
+  const out = document.createElement("strong");
+  out.textContent = text;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  const review = (good, correction) => {
+    addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
+    const all = reviews();
+    all[key] = { text: correction || p[lang] };
+    store.set("phrase-review", JSON.stringify(all));
+    renderPhrases();
+  };
+  const fav = { cat: p.c, source: uiLang, target: lang, input: p[uiLang], output: text };
+  const isFav = loadJson("favs").some((f) => favId(f) === favId(fav));
+  const star = mkBtn("#i-star", isFav ? "Aus Favoriten entfernen" : "Als Favorit speichern", () => {
+    const rest = loadJson("favs").filter((f) => favId(f) !== favId(fav));
+    setFavs(isFav ? rest : [fav, ...rest]);
+    renderPhrases();
+  });
+  star.classList.toggle("on", isFav);
+  row.append(
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
+    star,
+  );
+  if (p.own) {
+    row.append(mkBtn("#i-trash", "Phrase löschen", async () => {
+      if (!window.confirm(t("Phrase „{0}“ löschen?", p[uiLang]))) return;
+      try {
+        const res = await fetch("/api/my-phrases/" + p.id, { method: "DELETE", headers: { "X-App-Password": password } });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+      } catch (e) { setStatus(e.message); }
+      loadPhrases();
+    }));
+  } else if (lang === "rw" && !verified) {
+    // Bewertung nur für noch ungeprüfte Sätze, klein hinter einem Knopf
+    const pair = document.createElement("span");
+    pair.hidden = true;
+    const up = document.createElement("button");
+    up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
+    up.onclick = () => review(true, "");
+    const down = document.createElement("button");
+    down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
+    down.onclick = () => {
+      const fix = window.prompt(t("Richtige Übersetzung:"), text);
+      if (fix !== null && fix.trim()) review(false, fix.trim());
+    };
+    pair.append(up, down);
+    const more = document.createElement("button");
+    more.className = "icon"; more.textContent = "⋯"; more.title = t("Prüfen"); more.setAttribute("aria-label", t("Prüfen"));
+    more.onclick = () => { pair.hidden = !pair.hidden; };
+    row.append(more, pair);
+  }
+  card.append(...(meta.textContent ? [meta] : []), src, out, row);
+  return card;
+}
+
+// Kurzes Gespräch: Zeilen mit gleichem Titel ("d"), abwechselnd links (a) und rechts (b)
+function dialogCard(title, lines, lang) {
+  const box = document.createElement("div");
+  box.className = "dialog";
+  const head = document.createElement("h3");
+  head.textContent = t(title);
+  const log = document.createElement("div");
+  log.className = "chat-log";
+  log.append(...lines.map((p) => phraseCard(p, lang, "bubble fav " + (p.s === "b" ? "b" : "a"))));
+  box.append(head, log);
+  return box;
+}
 
 function renderPhrases() {
   if (!phrases) return;
-  const lang = $("ph-lang").value, rev = reviews();
-  $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
+  const cat = $("ph-cat").value, lang = $("ph-lang").value, favs = loadJson("favs");
   const q = fold($("ph-search").value);
-  const all = [...phrases, ...myPhrases];
-  // Suche: alle Kategorien und alle Sprachen, höchstens 80 Treffer
-  const shown = q
-    ? all.filter((p) => UI_LANGS.some((l) => fold(p[l]).includes(q))).slice(0, 80)
-    : all.filter((p) => p.c === $("ph-cat").value);
+  store.set("ph-cat", cat);
   $("ph-cat").hidden = !!q;
-  $("ph-list").replaceChildren(...shown.map((p) => {
-    const key = p.de + "|" + lang;
-    const r = rev[key];
-    const text = r && r.text ? r.text : p[lang];
-    const verified = lang === "rw" && (p.v || r);
-    const card = document.createElement("div");
-    card.className = "card fav";
-    const meta = document.createElement("small");
-    meta.textContent = [q ? t(p.c) : "", lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : ""].filter(Boolean).join(" · ");
-    const de = document.createElement("div");
-    de.textContent = p[uiLang];
-    const out = document.createElement("strong");
-    out.textContent = text;
-    const row = document.createElement("div");
-    row.className = "fav-actions";
-    const review = (good, correction) => {
-      addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
-      const all = reviews();
-      all[key] = { text: correction || p[lang] };
-      store.set("phrase-review", JSON.stringify(all));
-      renderPhrases();
-    };
-    row.append(
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
-    );
-    if (p.own) {
-      row.append(mkBtn("#i-trash", "Phrase löschen", async () => {
-        if (!window.confirm(t("Phrase „{0}“ löschen?", p[uiLang]))) return;
-        try {
-          const res = await fetch("/api/my-phrases/" + p.id, { method: "DELETE", headers: { "X-App-Password": password } });
-          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
-        } catch (e) { setStatus(e.message); }
-        loadPhrases();
-      }));
-    } else if (lang === "rw" && !verified) {
-      // Bewertung nur noch für noch ungeprüfte Sätze, klein hinter einem Knopf
-      const pair = document.createElement("span");
-      pair.hidden = true;
-      const up = document.createElement("button");
-      up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
-      up.onclick = () => review(true, "");
-      const down = document.createElement("button");
-      down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
-      down.onclick = () => {
-        const fix = window.prompt(t("Richtige Übersetzung:"), text);
-        if (fix !== null && fix.trim()) review(false, fix.trim());
-      };
-      pair.append(up, down);
-      const more = document.createElement("button");
-      more.className = "icon"; more.textContent = "⋯"; more.title = t("Prüfen"); more.setAttribute("aria-label", t("Prüfen"));
-      more.onclick = () => { pair.hidden = !pair.hidden; };
-      row.append(more, pair);
-    }
-    card.append(...(meta.textContent ? [meta] : []), de, out, row);
-    return card;
-  }));
+  $("ph-lang").hidden = cat === FAVS && !q;
+  $("ph-hint").hidden = cat === FAVS && !q;
+  $("fav-empty").hidden = !(cat === FAVS && !q && !favs.length);
+  $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
+  const all = [...phrases, ...myPhrases];
+  if (q) {
+    // Suche: alle Kategorien und alle Sprachen, höchstens 80 Treffer
+    const hits = all.filter((p) => UI_LANGS.some((l) => fold(p[l]).includes(q))).slice(0, 80);
+    $("ph-list").replaceChildren(...hits.map((p) => phraseCard(p, lang, "card fav", true)));
+    return;
+  }
+  if (cat === FAVS) { $("ph-list").replaceChildren(...favs.map(favCard)); return; }
+  const list = all.filter((p) => p.c === cat);
+  // eigene Favoriten dieser Kategorie oben, außer sie stammen selbst aus dem Phrasenbuch (die haben dort den Stern)
+  const own = favs.filter((f) => f.cat === cat && !list.some((p) => p[f.source] === f.input));
+  let cards;
+  if (cat === DIALOGS) {
+    const groups = new Map();
+    for (const p of list) groups.set(p.d, [...(groups.get(p.d) || []), p]);
+    cards = [...groups].map(([title, lines]) => dialogCard(title, lines, lang));
+  } else {
+    cards = list.map((p) => phraseCard(p, lang, "card fav"));
+  }
+  $("ph-list").replaceChildren(...own.map(favCard), ...cards);
 }
 $("ph-add").onclick = async () => {
   const text = $("ph-add-text").value.trim();
@@ -964,112 +1002,213 @@ $("quiz-next").onclick = () => {
 const nextHandler = $("quiz-next").onclick;
 $("quiz-stop").onclick = () => { quiz = null; $("quiz").hidden = true; $("learn-home").hidden = false; $("quiz-next").onclick = nextHandler; };
 
-// --- Gespräch über zwei Handys (Raum-Code, Abfrage alle 2 s) ---
-const cid = store.get("cid") || (() => { const v = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, ""); store.set("cid", v); return v; })();
-let room = null, lastId = 0, pollTimer = null;
+// --- Chats zwischen Personen: dauerhaft auf dem Server, Abfrage per Polling ---
+let room = null, lastId = 0, pollTimer = null; // room = geöffneter Chat (Zusammenfassung vom Server)
+const CHAT_IMAGE_SIDE = 1280; // Fotos vor dem Senden verkleinern (ca. 200-400 kB)
+const imageUrls = new Map(); // Datei -> Blob-URL; Bilder brauchen den Passwort-Header, darum kein <img src> direkt
 
 function setMode(mode) {
   $("chat-local").hidden = mode !== "local";
   $("chat-room").hidden = mode !== "room";
   $("mode-local").classList.toggle("active", mode === "local");
   $("mode-room").classList.toggle("active", mode === "room");
-  if (mode === "room" && room) startPolling(); else stopPolling();
+  store.set("chat-mode", mode);
+  startPolling();
 }
 $("mode-local").onclick = () => setMode("local");
 $("mode-room").onclick = () => setMode("room");
 
+// Offener Chat: alle 2 s neue Nachrichten; Chatliste: alle 10 s; sonst nur ab und zu für das Abzeichen
 function stopPolling() { clearInterval(pollTimer); pollTimer = null; }
-function startPolling() { stopPolling(); if ($("chat").hidden) return; poll(); pollTimer = setInterval(poll, 2000); }
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) stopPolling(); else if (room && !$("chat-room").hidden) startPolling();
-});
+function startPolling() {
+  stopPolling();
+  if (document.hidden || !password) return;
+  const inChats = !$("chat").hidden && !$("chat-room").hidden;
+  const tick = inChats && room ? poll : loadChats;
+  tick();
+  pollTimer = setInterval(tick, inChats ? (room ? 2000 : 10000) : 60000);
+}
+document.addEventListener("visibilitychange", startPolling);
+
+const chatLang = () => $("room-lang").value;
+const chatName = (c) => c.title || c.members.filter((m) => m.name !== myName).map((m) => m.name).join(", ");
+const clock = (sec) => new Date(sec * 1000).toLocaleString(uiLang, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "numeric" });
 
 function showRoom() {
-  $("room-join").hidden = !!room;
+  $("chats-home").hidden = !!room;
   $("room-live").hidden = !room;
-  if (room) $("room-title").textContent = room;
+  if (!room) return;
+  $("room-title").textContent = chatName(room);
+  $("room-members").textContent = room.members.map((m) => m.name + (m.lang ? ` (${LANG_LABELS[m.lang]})` : "")).join(", ");
 }
 
-async function enterRoom(code) {
-  const lang = $("room-lang").value;
-  store.set("room-lang", lang);
+async function loadChats() {
+  let list;
+  try { list = (await api("/api/chats")).chats; } catch { return; }
+  const unread = list.reduce((n, c) => n + c.unread, 0);
+  $("chat-badge").hidden = !unread;
+  $("chat-badge").textContent = unread > 9 ? "9+" : String(unread);
+  $("chats-empty").hidden = list.length > 0;
+  $("chats-list").replaceChildren(...list.map((c) => {
+    const card = document.createElement("button");
+    card.className = "card fav chat-item";
+    const head = document.createElement("div");
+    head.className = "chat-item-head";
+    const name = document.createElement("strong");
+    name.textContent = chatName(c);
+    head.append(name);
+    if (c.unread) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = c.unread;
+      head.append(badge);
+    }
+    const last = document.createElement("small");
+    last.textContent = c.last ? `${c.last.name === myName ? t("Du") : c.last.name}: ${c.last.image && !c.last.text ? "📷 " + t("Foto") : c.last.text} · ${clock(c.last.time)}` : t("Noch keine Nachrichten");
+    card.append(head, last);
+    card.onclick = () => openChat(c);
+    return card;
+  }));
+  const wanted = store.get("chat-open");
+  if (wanted && !room && !$("chat-room").hidden) {
+    const found = list.find((c) => c.id === wanted);
+    if (found) openChat(found); else store.del("chat-open");
+  }
+}
+
+function openChat(c) {
+  room = c; lastId = 0;
+  store.set("chat-open", c.id);
+  $("room-log").replaceChildren();
+  showRoom(); startPolling(); setStatus("");
+}
+
+function closeChat() {
+  room = null; store.del("chat-open");
+  showRoom(); startPolling();
+}
+$("room-back").onclick = closeChat;
+
+$("room-lang").onchange = () => {
+  store.set("room-lang", chatLang());
+  if (room) openChat(room); // alles neu in der gewählten Sprache laden
+};
+
+$("chat-new").addEventListener("toggle", async () => {
+  if (!$("chat-new").open) return;
+  try { people = (await api("/api/people")).people; } catch { people = []; }
+  peoplePicker($("chat-people"), pickedPeople($("chat-people")));
+});
+$("chat-create").onclick = async () => {
+  const members = pickedPeople($("chat-people"));
+  if (!members.length) { setStatus("Bitte mindestens eine Person auswählen"); return; }
   try {
-    const r = await api("/api/rooms", { cid, lang, code: code || null });
-    room = r.room; lastId = 0;
-    store.set("room", JSON.stringify({ room, lang }));
-    $("room-log").replaceChildren();
-    showRoom(); startPolling(); setStatus("");
+    const c = await api("/api/chats", { title: $("chat-title").value.trim(), members });
+    $("chat-title").value = ""; $("chat-new").open = false;
+    peoplePicker($("chat-people"));
+    openChat(c);
   } catch (e) { setStatus(e.message); }
-}
-$("room-create").onclick = () => enterRoom("");
-$("room-enter").onclick = () => { const c = $("room-code").value.trim(); if (c) enterRoom(c); };
-
-function resumeRoom() {
-  let saved = null;
-  try { saved = JSON.parse(store.get("room") || "null"); } catch { /* ignorieren */ }
-  if (!saved || room) return;
-  $("room-lang").value = saved.lang;
-  api("/api/rooms", { cid, lang: saved.lang, code: saved.room }).then((r) => {
-    room = r.room; lastId = 0; showRoom(); setMode("room");
-  }).catch(() => store.del("room"));
-}
+};
 
 async function poll() {
   if (!room) return;
+  const id = room.id;
   try {
-    const r = await api(`/api/rooms/${room}/messages?cid=${cid}&after=${lastId}`);
-    $("room-members").textContent = r.members.map((m) => `${m.name} (${LANG_LABELS[m.lang]})`).join(", ");
+    const r = await api(`/api/chats/${id}/messages?lang=${chatLang()}&after=${lastId}`);
+    if (!room || room.id !== id) return; // inzwischen anderer Chat geöffnet
+    room = r.chat; showRoom();
     for (const m of r.messages) { addRoomBubble(m); lastId = Math.max(lastId, m.id); }
+    if (r.messages.length) loadChats(); // gelesen: Abzeichen und Liste aktualisieren
   } catch (e) {
     setStatus(e.message);
-    if (/Raum|nicht/.test(e.message)) leaveRoom(false);
+    if (/Chat nicht gefunden/.test(e.message)) closeChat();
     else { stopPolling(); setTimeout(() => { if (room) startPolling(); }, 10000); } // bei Fehlern nicht im 2-s-Takt wiederholen
   }
+}
+
+async function chatImage(file) {
+  if (!imageUrls.has(file)) {
+    const res = await fetch(`/api/chats/${room.id}/images/${file}`, { headers: { "X-App-Password": password } });
+    if (!res.ok) throw new Error(t("Fehler {0}", res.status));
+    imageUrls.set(file, URL.createObjectURL(await res.blob()));
+  }
+  return imageUrls.get(file);
 }
 
 function addRoomBubble(m) {
   const div = document.createElement("div");
   div.className = "bubble " + (m.mine ? "b" : "a");
   const who = document.createElement("small");
-  who.textContent = m.mine ? t("Du") : m.name;
-  const big = document.createElement("div");
-  big.className = "big-text";
-  big.textContent = m.text;
-  div.append(who, big);
-  if (!m.mine && m.original !== m.text) {
-    const orig = document.createElement("small");
-    orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
-    div.append(orig);
+  who.textContent = `${m.mine ? t("Du") : m.name} · ${clock(m.time)}`;
+  div.append(who);
+  if (m.image) {
+    const img = document.createElement("img");
+    img.className = "chat-img"; img.alt = t("Foto");
+    chatImage(m.image).then((url) => {
+      img.src = url;
+      img.onclick = () => { $("img-zoom-pic").src = url; $("img-zoom").hidden = false; };
+    }).catch(() => { img.alt = t("Foto konnte nicht geladen werden"); });
+    div.append(img);
   }
-  const row = document.createElement("div");
-  row.className = "fav-actions";
-  const lang = $("room-lang").value;
-  row.append(
-    mkBtn("#i-speaker", "Vorlesen", () => speakAny(m.text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
-    mkBtn("#i-expand", "Groß anzeigen", () => zoom(m.text)),
-  );
-  div.append(row);
+  if (m.text) {
+    const big = document.createElement("div");
+    big.className = "big-text";
+    big.textContent = m.text;
+    div.append(big);
+    if (!m.mine && m.original !== m.text) {
+      const orig = document.createElement("small");
+      orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
+      div.append(orig);
+    }
+    const row = document.createElement("div");
+    row.className = "fav-actions";
+    const lang = m.mine ? m.lang : chatLang();
+    row.append(
+      mkBtn("#i-speaker", "Vorlesen", () => speakAny(m.text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
+      mkBtn("#i-expand", "Groß anzeigen", () => zoom(m.text)),
+    );
+    div.append(row);
+  }
   $("room-log").append(div);
   if (!typing()) div.scrollIntoView({ block: "nearest" });
 }
+$("img-zoom").onclick = () => { $("img-zoom").hidden = true; };
 
-$("room-send").onclick = async () => {
-  const text = $("room-text").value.trim();
-  if (!text || !room) return;
+async function sendChat(body) {
+  if (!room) return;
   $("room-send").disabled = true;
   try {
-    await api(`/api/rooms/${room}/messages`, { cid, text });
+    await api(`/api/chats/${room.id}/messages`, { lang: chatLang(), ...body });
     $("room-text").value = "";
+    setStatus("");
     await poll();
   } catch (e) { setStatus(e.message); }
   $("room-send").disabled = false;
+}
+$("room-send").onclick = () => {
+  const text = $("room-text").value.trim();
+  if (text) sendChat({ text });
+};
+// Foto mit dem Text im Eingabefeld als Bildunterschrift senden
+$("room-file").onchange = async () => {
+  const file = $("room-file").files[0];
+  $("room-file").value = "";
+  if (!file || !room) return;
+  setStatus("Foto wird gesendet …");
+  try {
+    const image = await imageToBase64(file, CHAT_IMAGE_SIDE);
+    await sendChat({ image, text: $("room-text").value.trim() });
+  } catch (e) { setStatus(e.message); }
 };
 
-function leaveRoom(notify = true) {
-  if (notify && room) fetch(`/api/rooms/${room}?cid=${cid}`, { method: "DELETE", headers: { "X-App-Password": password } }).catch(() => {});
-  room = null; stopPolling(); store.del("room"); showRoom();
-}
-$("room-leave").onclick = () => leaveRoom();
+$("room-leave").onclick = async () => {
+  if (!room || !window.confirm(t("Chat „{0}“ verlassen? Er verschwindet dann aus deiner Liste.", chatName(room)))) return;
+  try {
+    const res = await fetch(`/api/chats/${room.id}`, { method: "DELETE", headers: { "X-App-Password": password } });
+    if (!res.ok && res.status !== 404) throw new Error(t("Fehler {0}", res.status));
+  } catch (e) { setStatus(e.message); return; }
+  closeChat();
+};
 
 // --- Preisschild: Foto → Beträge → Euro ---
 function parsePrices(text) {
@@ -1113,7 +1252,6 @@ if ("serviceWorker" in navigator) {
 }
 
 applyUi();
-$("tab-favs").querySelector("span").textContent = t("Favoriten/Einstellungen").replace("/", "/\u200b"); // darf nach dem Schrägstrich umbrechen
 renderHistory();
 updateControls();
 
