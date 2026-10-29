@@ -153,6 +153,22 @@ def post(chat_id: str, name: str, lang: str, text: str, image_base64: str = "") 
         return msg
 
 
+def delete_message(chat_id: str, name: str, msg_id: int) -> None:
+    """Eigene Nachricht (samt Foto) löschen. Die ID wird gemerkt, damit andere Geräte sie ausblenden."""
+    with _lock:
+        chat = _get(chat_id, name)
+        msg = next((m for m in chat["messages"] if m["id"] == msg_id), None)
+        if msg is None:
+            raise ChatError("Nachricht nicht gefunden")
+        if msg["name"] != name:
+            raise ChatError("Nur eigene Nachrichten können gelöscht werden")
+        if msg.get("image"):
+            (_dir() / chat_id / msg["image"]).unlink(missing_ok=True)
+        chat["messages"].remove(msg)
+        chat["deleted"] = (chat.get("deleted", []) + [msg_id])[-MAX_MESSAGES:]
+        _save(chat)
+
+
 def image_path(chat_id: str, name: str, file: str) -> Path:
     with _lock:
         chat = _get(chat_id, name)
@@ -190,4 +206,4 @@ def fetch(chat_id: str, name: str, lang: str, after: int, translate: Callable[[s
         me["seen"], me["lang"] = max(me.get("seen", 0), last_id), lang
         if changed:
             _save(chat)
-        return {"messages": out, "chat": _summary(chat, name)}
+        return {"messages": out, "deleted": chat.get("deleted", []), "chat": _summary(chat, name)}

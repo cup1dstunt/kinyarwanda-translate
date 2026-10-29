@@ -256,6 +256,24 @@ def test_chat_images(web):
     assert web.post(url, headers=ha, json={"lang": "de"}).status_code == 400
 
 
+def test_chat_delete_own_message(web):
+    import base64
+
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    jpeg = base64.b64encode(b"\xff\xd8\xff\xe0" + b"0" * 100).decode()
+    pic = web.post(url, headers=ha, json={"lang": "de", "image": jpeg}).json()["id"]
+    web.post(url, headers=hb, json={"lang": "de", "text": "Schön!"})
+    file = web.get(url, params={"lang": "de"}, headers=hb).json()["messages"][0]["image"]
+    assert web.delete(f"{url}/{pic}", headers=hb).status_code == 403  # fremde Nachricht
+    assert web.delete(f"{url}/{pic}", headers=ha).status_code == 200
+    assert web.delete(f"{url}/{pic}", headers=ha).status_code == 404
+    got = web.get(url, params={"lang": "de"}, headers=hb).json()
+    assert [m["text"] for m in got["messages"]] == ["Schön!"] and got["deleted"] == [pic]
+    assert web.get(f"/api/chats/{chat['id']}/images/{file}", headers=hb).status_code == 404
+
+
 def test_chat_errors_and_leave(web):
     ha, hb = _two_people(web)
     assert web.post("/api/chats", headers=ha, json={"members": []}).status_code == 400

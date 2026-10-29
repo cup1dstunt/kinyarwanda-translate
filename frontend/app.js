@@ -146,8 +146,10 @@ function keepFieldVisible() {
   document.documentElement.style.setProperty("--kb", (kb > 80 ? kb : 0) + "px");
   const el = document.activeElement;
   if (kb <= 80 || !isField(el) || el.tagName === "SELECT") return;
-  const r = el.getBoundingClientRect();
   const top = vv.offsetTop + 12, bottom = vv.offsetTop + vv.height - 12;
+  // möglichst die ganze Karte samt Knöpfen (z. B. „Senden“) zeigen, nicht nur das Textfeld
+  const box = el.closest(".chat-input, .pane");
+  const r = (box && box.getBoundingClientRect().height <= bottom - top ? box : el).getBoundingClientRect();
   // Feld passt: ganz zeigen; Feld zu hoch: Anfang zeigen
   const delta = r.height > bottom - top || r.top < top ? r.top - top : Math.max(0, r.bottom - bottom);
   if (Math.abs(delta) > 4) window.scrollBy(0, delta);
@@ -1025,6 +1027,7 @@ $("quiz-stop").onclick = () => { quiz = null; $("quiz").hidden = true; $("learn-
 
 // --- Chats zwischen Personen: dauerhaft auf dem Server, Abfrage per Polling ---
 let room = null, lastId = 0, pollTimer = null; // room = geöffneter Chat (Zusammenfassung vom Server)
+let chatGen = 0, polling = false, pollAgain = false; // nie zwei Abfragen gleichzeitig (sonst doppelte Nachrichten)
 const CHAT_IMAGE_SIDE = 1280; // Fotos vor dem Senden verkleinern (ca. 200-400 kB)
 const imageUrls = new Map(); // Datei -> Blob-URL; Bilder brauchen den Passwort-Header, darum kein <img src> direkt
 
@@ -1098,7 +1101,7 @@ async function loadChats() {
 }
 
 function openChat(c) {
-  room = c; lastId = 0;
+  room = c; lastId = 0; chatGen++;
   store.set("chat-open", c.id);
   $("room-log").replaceChildren();
   showRoom(); startPolling(); setStatus("");
@@ -1133,19 +1136,32 @@ $("chat-create").onclick = async () => {
 
 async function poll() {
   if (!room) return;
-  const id = room.id;
+  // iOS löst beim Senden, beim Foto-Auswählen und beim Zurückkehren in die App zusätzliche Abfragen aus.
+  // Läuft schon eine, nur vormerken; danach genau eine weitere.
+  if (polling) { pollAgain = true; return; }
+  polling = true;
+  const id = room.id, gen = chatGen;
   try {
     const r = await api(`/api/chats/${id}/messages?lang=${chatLang()}&after=${lastId}`);
-    if (!room || room.id !== id) return; // inzwischen anderer Chat geöffnet
+    if (gen !== chatGen || !room) return; // inzwischen anderer Chat geöffnet oder Sprache gewechselt
     room = r.chat; showRoom();
-    for (const m of r.messages) { addRoomBubble(m); lastId = Math.max(lastId, m.id); }
+    for (const m of r.messages) {
+      if (!roomBubble(m.id)) addRoomBubble(m);
+      lastId = Math.max(lastId, m.id);
+    }
+    for (const gone of r.deleted || []) { const el = roomBubble(gone); if (el) el.remove(); }
     if (r.messages.length) loadChats(); // gelesen: Abzeichen und Liste aktualisieren
   } catch (e) {
     setStatus(e.message);
     if (/Chat nicht gefunden/.test(e.message)) closeChat();
     else { stopPolling(); setTimeout(() => { if (room) startPolling(); }, 10000); } // bei Fehlern nicht im 2-s-Takt wiederholen
+  } finally {
+    polling = false;
+    if (pollAgain) { pollAgain = false; poll(); }
   }
 }
+
+const roomBubble = (msgId) => $("room-log").querySelector(`[data-id="${msgId}"]`);
 
 async function chatImage(file) {
   if (!imageUrls.has(file)) {
@@ -1159,6 +1175,7 @@ async function chatImage(file) {
 function addRoomBubble(m) {
   const div = document.createElement("div");
   div.className = "bubble " + (m.mine ? "b" : "a");
+  div.dataset.id = m.id;
   const who = document.createElement("small");
   who.textContent = `${m.mine ? t("Du") : m.name} · ${clock(m.time)}`;
   div.append(who);
@@ -1171,6 +1188,8 @@ function addRoomBubble(m) {
     }).catch(() => { img.alt = t("Foto konnte nicht geladen werden"); });
     div.append(img);
   }
+  const row = document.createElement("div");
+  row.className = "fav-actions";
   if (m.text) {
     const big = document.createElement("div");
     big.className = "big-text";
@@ -1181,17 +1200,46 @@ function addRoomBubble(m) {
       orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
       div.append(orig);
     }
-    const row = document.createElement("div");
-    row.className = "fav-actions";
     const lang = m.mine ? m.lang : chatLang();
     row.append(
       mkBtn("#i-speaker", "Vorlesen", () => speakAny(m.text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
       mkBtn("#i-expand", "Groß anzeigen", () => zoom(m.text)),
     );
-    div.append(row);
   }
+  if (m.image) row.append(mkBtn("#i-download", "Foto speichern", () => saveChatImage(m.image)));
+  if (m.mine) row.append(mkBtn("#i-trash", "Nachricht löschen", () => deleteChatMessage(m.id)));
+  div.append(row);
   $("room-log").append(div);
   if (!typing()) div.scrollIntoView({ block: "nearest" });
+}
+
+// Foto aufs Handy: auf dem iPhone über das Teilen-Menü („Bild sichern“), sonst als Download
+async function saveChatImage(file) {
+  try {
+    const url = await chatImage(file);
+    const blob = await (await fetch(url)).blob();
+    const photo = new File([blob], `foto-${file}`, { type: "image/jpeg" });
+    if (navigator.canShare && navigator.canShare({ files: [photo] })) {
+      await navigator.share({ files: [photo] });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = url; a.download = photo.name;
+    document.body.append(a); a.click(); a.remove();
+  } catch (e) {
+    if (e.name !== "AbortError") setStatus(e.message);
+  }
+}
+
+async function deleteChatMessage(msgId) {
+  if (!room || !window.confirm(t("Nachricht löschen? Sie verschwindet auch bei den anderen."))) return;
+  try {
+    const res = await fetch(`/api/chats/${room.id}/messages/${msgId}`, { method: "DELETE", headers: { "X-App-Password": password } });
+    if (!res.ok && res.status !== 404) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+    const el = roomBubble(msgId);
+    if (el) el.remove();
+    loadChats();
+  } catch (e) { setStatus(e.message); }
 }
 $("img-zoom").onclick = () => { $("img-zoom").hidden = true; };
 
