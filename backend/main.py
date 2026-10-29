@@ -349,7 +349,8 @@ def _chat_call(fn, *args):
         return fn(*args)
     except chats.ChatError as exc:
         msg = str(exc)
-        raise HTTPException(404 if "nicht gefunden" in msg else 400, msg)
+        status = 404 if "nicht gefunden" in msg else 403 if msg.startswith("Nur eigene") else 400
+        raise HTTPException(status, msg)
 
 
 @app.get("/api/chats")
@@ -382,6 +383,12 @@ def chat_fetch(chat_id: str, lang: str, after: int = 0, user: users.User = Depen
     if lang not in LANGUAGES:
         raise HTTPException(400, "Ungültige Sprachwahl")
     return _chat_call(chats.fetch, chat_id, user.name, lang, after, lambda t, s_, g: translate_text(t, s_, g)[0])
+
+
+@app.delete("/api/chats/{chat_id}/messages/{msg_id}")
+def chat_delete_message(chat_id: str, msg_id: int, user: users.User = Depends(require_password)):
+    _chat_call(chats.delete_message, chat_id, user.name, msg_id)
+    return {"ok": True}
 
 
 @app.get("/api/chats/{chat_id}/images/{file}")
