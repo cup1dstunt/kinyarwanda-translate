@@ -145,6 +145,10 @@
           </div>
           <div id="room-log" class="chat-log" aria-live="polite"></div>
           <div class="card chat-input">
+            <div id="photo-preview" class="photo-preview" hidden>
+              <img id="photo-preview-img" alt="">
+              <button id="photo-cancel" class="icon round" title="Foto verwerfen" aria-label="Foto verwerfen"><svg><use href="#i-clear"/></svg></button>
+            </div>
             <textarea id="room-text" placeholder="Nachricht eingeben oder diktieren" maxlength="2000" aria-label="Nachricht"></textarea>
             <div class="pane-actions">
               <label id="room-photo" class="icon" title="Foto senden" aria-label="Foto senden"><svg><use href="#i-camera"/></svg><input id="room-file" type="file" accept="image/*" hidden></label>
