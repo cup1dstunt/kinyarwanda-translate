@@ -129,7 +129,10 @@ $("clear").onclick = () => {
 
 // iOS: Mit offener Tastatur springt die Ansicht, wenn die fixierte Tab-Leiste und
 // automatisches Scrollen mitspielen. Tab-Leiste daher während der Eingabe ausblenden.
-const isField = (el) => el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName);
+// Nur Felder, für die eine Tastatur erscheint. Foto-Auswahl, Häkchen usw. zählen nicht: Bricht man die
+// iOS-Fotoauswahl ab, kommt kein focusout, und die Ansicht bliebe im Tipp-Modus hängen.
+const isField = (el) => !!el && (/^(TEXTAREA|SELECT)$/.test(el.tagName) ||
+  (el.tagName === "INPUT" && !/^(file|checkbox|radio|button|submit|range|color)$/.test(el.type)));
 const typing = () => isField(document.activeElement);
 document.addEventListener("focusin", (e) => { if (isField(e.target)) document.body.classList.add("typing"); });
 document.addEventListener("focusout", () => {
@@ -1102,6 +1105,7 @@ async function loadChats() {
 
 function openChat(c) {
   room = c; lastId = 0; chatGen++;
+  clearPhoto();
   store.set("chat-open", c.id);
   $("room-log").replaceChildren();
   showRoom(); startPolling(); setStatus("");
@@ -1244,30 +1248,48 @@ async function deleteChatMessage(msgId) {
 $("img-zoom").onclick = () => { $("img-zoom").hidden = true; };
 
 async function sendChat(body) {
-  if (!room) return;
+  if (!room) return false;
   $("room-send").disabled = true;
+  let ok = false;
   try {
     await api(`/api/chats/${room.id}/messages`, { lang: chatLang(), ...body });
     $("room-text").value = "";
     setStatus("");
+    ok = true;
     await poll();
   } catch (e) { setStatus(e.message); }
   $("room-send").disabled = false;
+  return ok;
 }
-$("room-send").onclick = () => {
+// Foto erst als Vorschau zeigen; gesendet wird es mit „Senden“ (Text im Feld = Bildunterschrift)
+let pendingPhoto = null;
+function clearPhoto() {
+  pendingPhoto = null;
+  $("photo-preview").hidden = true;
+  $("photo-preview-img").removeAttribute("src");
+}
+$("photo-cancel").onclick = clearPhoto;
+
+$("room-send").onclick = async () => {
   const text = $("room-text").value.trim();
-  if (text) sendChat({ text });
+  if (pendingPhoto) {
+    const image = pendingPhoto;
+    setStatus("Foto wird gesendet …");
+    if (await sendChat({ image, text })) clearPhoto();
+  } else if (text) {
+    sendChat({ text });
+  }
 };
-// Foto mit dem Text im Eingabefeld als Bildunterschrift senden
 $("room-file").onchange = async () => {
   const file = $("room-file").files[0];
   $("room-file").value = "";
   if (!file || !room) return;
-  setStatus("Foto wird gesendet …");
   try {
-    const image = await imageToBase64(file, CHAT_IMAGE_SIDE);
-    await sendChat({ image, text: $("room-text").value.trim() });
-  } catch (e) { setStatus(e.message); }
+    pendingPhoto = await imageToBase64(file, CHAT_IMAGE_SIDE);
+    $("photo-preview-img").src = "data:image/jpeg;base64," + pendingPhoto;
+    $("photo-preview").hidden = false;
+    setStatus("");
+  } catch (e) { clearPhoto(); setStatus(e.message); }
 };
 
 $("room-leave").onclick = async () => {

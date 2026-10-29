@@ -201,6 +201,7 @@ const I18N = {
   "Nachricht löschen? Sie verschwindet auch bei den anderen.": {"en": "Delete message? It will also disappear for the others.", "fr": "Supprimer le message ? Il disparaîtra aussi chez les autres.", "rw": "Gusiba ubutumwa? Buzavaho no ku bandi."},
   "Nachricht nicht gefunden": {"en": "Message not found", "fr": "Message introuvable", "rw": "Ubutumwa ntibubonetse"},
   "Nur eigene Nachrichten können gelöscht werden": {"en": "You can only delete your own messages", "fr": "Vous ne pouvez supprimer que vos propres messages", "rw": "Ushobora gusiba ubutumwa bwawe gusa"},
+  "Foto verwerfen": {"en": "Discard photo", "fr": "Supprimer la photo", "rw": "Reka ifoto"},
   "Alle Kategorien": {"en": "All categories", "fr": "Toutes les catégories", "rw": "Ibyiciro byose"},
   "Alltagssprache": {"en": "Everyday language", "fr": "Langue de tous les jours", "rw": "Ururimi rwa buri munsi"},
   "Arzt": {"en": "Doctor", "fr": "Médecin", "rw": "Muganga"},

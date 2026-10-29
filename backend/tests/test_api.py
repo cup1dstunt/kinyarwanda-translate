@@ -85,7 +85,7 @@ def test_convert(web, monkeypatch):
 def test_pwa_files_served(web):
     assert web.get("/manifest.json").status_code == 200
     assert web.get("/sw.js").status_code == 200
-    assert "Mukunzi Talk" in web.get("/").text
+    assert "<title>Ikiraro</title>" in web.get("/").text
 
 
 def test_health_shows_version(web, monkeypatch):
