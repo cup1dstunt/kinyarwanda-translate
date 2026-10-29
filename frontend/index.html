@@ -125,6 +125,10 @@
             <label for="room-lang"><small>Ich schreibe und lese auf</small></label>
             <select id="room-lang"></select>
           </div>
+          <div id="push-box" class="card cur" hidden>
+            <small id="push-hint"></small>
+            <button id="push-btn" class="primary">Mitteilungen einschalten</button>
+          </div>
           <div id="chats-list" class="fav-list"></div>
           <p id="chats-empty" class="empty">Noch keine Chats. Lege unten den ersten an.</p>
           <details id="chat-new" class="card">
@@ -245,6 +249,7 @@
         <button id="rate-export" class="primary">Exportieren</button>
         <button id="rate-clear" class="ghost">Bewertungen löschen</button>
       </details>
+      <button id="push-off" class="ghost" hidden>Mitteilungen ausschalten</button>
       <details id="admin" class="card" hidden>
         <summary>Zugänge verwalten</summary>
         <p><small>Jede Person bekommt einen eigenen Code statt deines Passworts. Einzeln sperrbar.</small></p>

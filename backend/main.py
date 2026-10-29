@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import cache, chats, currency, lists, ocr, tts, userphrases, users
+from . import cache, chats, currency, lists, ocr, push, tts, userphrases, users
 from .config import env, max_input_chars
 from .providers import LANGUAGES, ProviderError, available_providers
 
@@ -79,6 +79,16 @@ class NewChat(BaseModel):
     members: list[str]
 
 
+class PushKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscription(BaseModel):
+    endpoint: str
+    keys: PushKeys | None = None
+
+
 class ChatMessage(BaseModel):
     lang: str
     text: str = ""
@@ -122,6 +132,7 @@ def providers(user: users.User = Depends(require_password)):
         "languages": LANGUAGES,
         "tts": bool(tts.api_key()),
         "ocr": bool(ocr.api_key()),
+        "push": push.public_key() if push.enabled() else None,
     }
 
 
@@ -364,7 +375,8 @@ def chat_create(req: NewChat, user: users.User = Depends(require_password)):
 
 
 @app.post("/api/chats/{chat_id}/messages")
-def chat_post(chat_id: str, req: ChatMessage, user: users.User = Depends(require_password)):
+def chat_post(chat_id: str, req: ChatMessage, background: BackgroundTasks,
+              user: users.User = Depends(require_password)):
     text = req.text.strip()
     if not text and not req.image:
         raise HTTPException(400, "Kein Text")
@@ -375,7 +387,45 @@ def chat_post(chat_id: str, req: ChatMessage, user: users.User = Depends(require
     if len(req.image) > ocr.MAX_IMAGE_BASE64:
         raise HTTPException(413, "Bild fehlt oder ist zu groß")
     msg = _chat_call(chats.post, chat_id, user.name, req.lang, text, req.image)
+    if push.enabled():
+        background.add_task(notify_chat, chat_id, msg["id"], user.name)  # läuft nach der Antwort
     return {"id": msg["id"]}
+
+
+PHOTO_WORD = {"de": "Foto", "en": "Photo", "fr": "Photo", "rw": "Ifoto"}
+
+
+def notify_chat(chat_id: str, msg_id: int, sender: str) -> None:
+    """Mitteilung an alle, die den Chat gerade nicht offen haben, in ihrer Sprache."""
+    for name, lang in chats.recipients(chat_id, sender):
+        if not push.has_devices(name):
+            continue
+        info = chats.notice(chat_id, msg_id, lang, lambda t, s_, g: translate_text(t, s_, g)[0])
+        if info is None:
+            return
+        photo = "📷 " + PHOTO_WORD.get(lang, "Foto")
+        body = (photo + " · " + info["text"] if info["image"] and info["text"] else info["text"] or photo)[:180]
+        title = f"{info['name']} · {info['title']}" if info["title"] else info["name"]
+        push.send(name, {"title": title, "body": body, "chat": chat_id, "badge": chats.unread_total(name)})
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(req: PushSubscription, user: users.User = Depends(require_password)):
+    if not push.enabled():
+        raise HTTPException(503, "Mitteilungen sind auf dem Server nicht eingerichtet")
+    if req.keys is None:
+        raise HTTPException(400, "Ungültige Anmeldung für Mitteilungen")
+    try:
+        push.subscribe(user.name, req.endpoint, req.keys.p256dh, req.keys.auth)
+    except push.PushError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True}
+
+
+@app.post("/api/push/unsubscribe")
+def push_unsubscribe(req: PushSubscription, user: users.User = Depends(require_password)):
+    push.unsubscribe(user.name, req.endpoint)
+    return {"ok": True}
 
 
 @app.get("/api/chats/{chat_id}/messages")

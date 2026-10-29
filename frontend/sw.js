@@ -1,6 +1,6 @@
 "use strict";
 // Service Worker nur für die App-Hülle; API-Aufrufe gehen immer ans Netz.
-const CACHE = "shell-v25";
+const CACHE = "shell-v26";
 const SHELL = ["/", "/index.html", "/style.css", "/app.js", "/i18n.js", "/manifest.json", "/icon-192.png", "/phrases.json", "/dictionary.json"];
 
 self.addEventListener("install", (e) => {
@@ -29,4 +29,29 @@ self.addEventListener("fetch", (e) => {
       })
       .catch(() => caches.match(e.request))
   );
+});
+
+// Push-Mitteilung für eine neue Chat-Nachricht (iOS verlangt, dass jede sichtbar angezeigt wird)
+self.addEventListener("push", (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch { data = { body: e.data ? e.data.text() : "" }; }
+  const jobs = [self.registration.showNotification(data.title || "Ikiraro", {
+    body: data.body || "", tag: data.chat || "chat", renotify: true,
+    icon: "/icon-192.png", badge: "/favicon-32.png", data: { chat: data.chat || "" },
+  })];
+  if (self.navigator.setAppBadge && data.badge) jobs.push(self.navigator.setAppBadge(data.badge).catch(() => {}));
+  e.waitUntil(Promise.all(jobs));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const chat = (e.notification.data && e.notification.data.chat) || "";
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    const win = list[0];
+    if (win) {
+      win.postMessage({ chat });
+      return win.focus();
+    }
+    return self.clients.openWindow("/" + (chat ? "?chat=" + encodeURIComponent(chat) : ""));
+  }));
 });

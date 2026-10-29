@@ -443,3 +443,88 @@ def test_static_files_are_revalidated(web):
     # sonst hält iOS alte app.js fest und die App startet nach einem Update nicht
     assert web.get("/app.js").headers["cache-control"] == "no-cache"
     assert web.get("/").headers["cache-control"] == "no-cache"
+
+
+def _device():
+    """Ein simuliertes Handy: Schlüsselpaar und Auth-Geheimnis wie beim Browser-Abo."""
+    import base64
+    import os
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    auth = os.urandom(16)
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()  # noqa: E731
+    sub = {"endpoint": "https://web.push.apple.com/abc" + b64(os.urandom(6)), "keys": {"p256dh": b64(pub), "auth": b64(auth)}}
+    return sub, key, auth
+
+
+@pytest.fixture
+def vapid(monkeypatch):
+    from backend import push
+
+    pub, priv = push.generate_keys()
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", pub)
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", priv)
+    return pub
+
+
+def test_push_encryption_roundtrip(vapid):
+    import http_ece
+
+    from backend import push
+
+    sub, key, auth = _device()
+    flat = {"endpoint": sub["endpoint"], **sub["keys"]}
+    body = push.encrypt(flat, b'{"title": "Anna"}')
+    assert http_ece.decrypt(body, private_key=key, auth_secret=auth, version="aes128gcm") == b'{"title": "Anna"}'
+    header = push._vapid_headers(sub["endpoint"])["Authorization"]
+    assert header.startswith("vapid t=") and header.endswith("k=" + vapid)
+
+
+def test_push_subscribe_rules(web, vapid):
+    assert web.get("/api/providers", headers=H).json()["push"] == vapid
+    sub, _, _ = _device()
+    assert web.post("/api/push/subscribe", headers=H, json=sub).status_code == 200
+    for bad in ("http://web.push.apple.com/x", "https://evil.example.com/x", "https://push.apple.com.evil.com/x"):
+        assert web.post("/api/push/subscribe", headers=H, json={**sub, "endpoint": bad}).status_code == 400
+    assert web.post("/api/push/subscribe", headers=H, json={**sub, "keys": {"p256dh": "x", "auth": "y"}}).status_code == 400
+    assert web.post("/api/push/subscribe", json=sub).status_code == 401
+
+
+def test_push_on_new_chat_message(web, vapid, monkeypatch):
+    import json
+
+    from backend import chats, push
+
+    class Fake:
+        def translate(self, text, source, target):
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    sent = []
+
+    def deliver(sub, payload, client):
+        sent.append(json.loads(payload))
+        return 201
+
+    monkeypatch.setattr(push, "_deliver", deliver)
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"title": "Familie", "members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    web.get(url, params={"lang": "rw"}, headers=hb)  # Ben liest auf Kinyarwanda
+    sub, _, _ = _device()
+    assert web.post("/api/push/subscribe", headers=hb, json=sub).status_code == 200
+    chats._reading.clear()  # Ben hat den Chat geschlossen
+    web.post(url, headers=ha, json={"lang": "de", "text": "Hallo"})
+    assert sent == [{"title": "Anna · Familie", "body": "[rw] Hallo", "chat": chat["id"], "badge": 1}]
+    web.get(url, params={"lang": "rw"}, headers=hb)  # Ben hat den Chat offen: keine Mitteilung
+    web.post(url, headers=ha, json={"lang": "de", "text": "Bist du da?"})
+    assert len(sent) == 1
+    # abgemeldetes Gerät (410) wird entfernt
+    chats._reading.clear()
+    monkeypatch.setattr(push, "_deliver", lambda sub, payload, client: 410)
+    web.post(url, headers=ha, json={"lang": "de", "text": "Hallo?"})
+    assert not push.has_devices("Ben")
