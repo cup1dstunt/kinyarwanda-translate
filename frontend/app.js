@@ -72,6 +72,7 @@ async function init() {
     fill($("learn-tgt"), info.languages, (l) => LANG_LABELS[l]);
     $("learn-src").value = uiLang; $("learn-tgt").value = uiLang === "rw" ? "de" : "rw";
     myName = info.me ? info.me.name : "";
+    pushKey = info.push || null;
     myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
     $("room-lang").value = store.get("room-lang") || uiLang;
@@ -83,6 +84,9 @@ async function init() {
     updateWho();
     showTab("translate");
     updateControls();
+    renderPush();
+    const fromNotice = new URLSearchParams(location.search).get("chat");
+    if (fromNotice) { history.replaceState(null, "", "/"); openChatFromNotice(fromNotice); }
   } catch (e) { setStatus(e.message); }
 }
 
@@ -1075,6 +1079,8 @@ async function loadChats() {
   const unread = list.reduce((n, c) => n + c.unread, 0);
   $("chat-badge").hidden = !unread;
   $("chat-badge").textContent = unread > 9 ? "9+" : String(unread);
+  // Zahl am App-Symbol (iOS nur mit erlaubten Mitteilungen, Android zeigt stattdessen einen Punkt)
+  try { if (navigator.setAppBadge) await (unread ? navigator.setAppBadge(unread) : navigator.clearAppBadge()); } catch { /* nicht erlaubt */ }
   $("chats-empty").hidden = list.length > 0;
   $("chats-list").replaceChildren(...list.map((c) => {
     const card = document.createElement("button");
@@ -1106,6 +1112,7 @@ async function loadChats() {
 function openChat(c) {
   room = c; lastId = 0; chatGen++;
   clearPhoto();
+  closeNotifications(c.id);
   store.set("chat-open", c.id);
   $("room-log").replaceChildren();
   showRoom(); startPolling(); setStatus("");
@@ -1291,6 +1298,95 @@ $("room-file").onchange = async () => {
     setStatus("");
   } catch (e) { clearPhoto(); setStatus(e.message); }
 };
+
+// --- Push-Mitteilungen für neue Chat-Nachrichten ---
+let pushKey = null; // öffentlicher Server-Schlüssel, null = auf dem Server nicht eingerichtet
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function keyBytes(b64) {
+  const raw = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+async function currentSubscription() {
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+async function renderPush() {
+  $("push-box").hidden = !pushKey;
+  if (!pushKey) return;
+  $("push-btn").hidden = true;
+  if (!pushSupported()) {
+    $("push-hint").textContent = t(/iPhone|iPad/.test(navigator.userAgent) && !standalone()
+      ? "Mitteilungen gehen auf dem iPhone nur in der App vom Home-Bildschirm."
+      : "Dieses Gerät unterstützt keine Mitteilungen.");
+    return;
+  }
+  if (Notification.permission === "denied") {
+    $("push-hint").textContent = t("Mitteilungen sind blockiert. Bitte in den Einstellungen des Handys für diese App erlauben.");
+    return;
+  }
+  let sub = null;
+  try { sub = await currentSubscription(); } catch { /* Service Worker noch nicht bereit */ }
+  if (sub) {
+    // bei jedem Start erneut melden: falls der Server sie verloren hat oder sich jemand anderes angemeldet hat
+    api("/api/push/subscribe", sub.toJSON()).catch(() => {});
+    $("push-box").hidden = true; // eingeschaltet: Hinweis ausblenden, Ausschalten unter Einstellungen
+  } else {
+    $("push-hint").textContent = t("Bei neuen Nachrichten eine Mitteilung bekommen, auch wenn die App zu ist.");
+    $("push-btn").hidden = false;
+  }
+  $("push-off").hidden = !sub;
+}
+
+$("push-btn").onclick = async () => {
+  $("push-btn").disabled = true;
+  try {
+    // iOS fragt nur direkt nach einem Antippen
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") throw new Error(t("Mitteilungen wurden nicht erlaubt."));
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushKey) });
+    await api("/api/push/subscribe", sub.toJSON());
+    setStatus("Mitteilungen sind eingeschaltet.");
+  } catch (e) { setStatus(e.message); }
+  $("push-btn").disabled = false;
+  renderPush();
+};
+
+$("push-off").onclick = async () => {
+  try {
+    const sub = await currentSubscription();
+    if (sub) {
+      await api("/api/push/unsubscribe", { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }
+    setStatus("Mitteilungen sind ausgeschaltet.");
+  } catch (e) { setStatus(e.message); }
+  renderPush();
+};
+
+async function closeNotifications(chatId) {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    for (const n of await reg.getNotifications({ tag: chatId })) n.close();
+  } catch { /* ohne Service Worker nichts zu tun */ }
+}
+
+// Mitteilung angetippt: Chat öffnen (App war schon offen → Nachricht vom Service Worker, sonst ?chat= in der Adresse)
+function openChatFromNotice(chatId) {
+  if (!chatId) return;
+  store.set("chat-open", chatId);
+  if (room && room.id === chatId) { showTab("chat"); return; }
+  room = null; showRoom();
+  setMode("room");
+  showTab("chat");
+}
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.chat) openChatFromNotice(e.data.chat); });
+}
 
 $("room-leave").onclick = async () => {
   if (!room || !window.confirm(t("Chat „{0}“ verlassen? Er verschwindet dann aus deiner Liste.", chatName(room)))) return;

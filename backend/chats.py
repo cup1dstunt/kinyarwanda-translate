@@ -24,6 +24,8 @@ EXPIRE_SECONDS = 180 * 24 * 3600  # Chats ohne Aktivität nach einem halben Jahr
 _lock = threading.Lock()
 _chats: dict[str, dict] = {}  # id -> Chat, beim ersten Zugriff von der Platte geladen
 _loaded_from: Path | None = None  # Tests wechseln den Datenordner
+_reading: dict[tuple[str, str], float] = {}  # (Chat, Person) -> letzte Abfrage; wer gerade liest, bekommt keine Mitteilung
+READING_SECONDS = 15
 
 
 class ChatError(Exception):
@@ -177,8 +179,51 @@ def image_path(chat_id: str, name: str, file: str) -> Path:
         return _dir() / chat_id / file
 
 
+def unread_total(name: str) -> int:
+    with _lock:
+        return sum(_summary(c, name)["unread"] for c in _all().values() if name in c["members"])
+
+
+def recipients(chat_id: str, sender: str) -> list[tuple[str, str]]:
+    """(Name, Sprache) aller anderen Mitglieder, die den Chat gerade nicht offen haben."""
+    now = time.time()
+    with _lock:
+        chat = _all().get(chat_id)
+        if chat is None:
+            return []
+        return [(n, m.get("lang") or "de") for n, m in chat["members"].items()
+                if n != sender and now - _reading.get((chat_id, n), 0) > READING_SECONDS]
+
+
+def notice(chat_id: str, msg_id: int, lang: str, translate: Callable[[str, str, str], str]) -> dict | None:
+    """Inhalt einer Mitteilung in der Sprache des Empfängers; die Übersetzung wird für später gemerkt."""
+    with _lock:
+        chat = _all().get(chat_id)
+        msg = chat and next((m for m in chat["messages"] if m["id"] == msg_id), None)
+        if msg is None:
+            return None
+        info = {"title": chat["title"], "name": msg["name"], "image": bool(msg.get("image")), "text": msg["text"],
+                "source": msg["lang"], "cached": msg["tr"].get(lang)}
+    text = info["text"]
+    if text and info["source"] != lang:
+        if info["cached"] is not None:
+            text = info["cached"]
+        else:
+            try:
+                text = translate(info["text"], info["source"], lang)
+            except Exception:  # dann eben das Original
+                text = info["text"]
+            else:
+                with _lock:
+                    if msg in chat["messages"]:
+                        msg["tr"][lang] = text
+                        _save(chat)
+    return {"title": info["title"], "name": info["name"], "image": info["image"], "text": text}
+
+
 def fetch(chat_id: str, name: str, lang: str, after: int, translate: Callable[[str, str, str], str]) -> dict:
     """Neue Nachrichten in der Sprache des Lesenden. Übersetzt wird außerhalb der Sperre."""
+    _reading[(chat_id, name)] = time.time()
     with _lock:
         chat = _get(chat_id, name)
         todo = [(m["id"], m["text"], m["lang"]) for m in chat["messages"]

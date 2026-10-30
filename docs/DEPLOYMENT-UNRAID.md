@@ -56,4 +56,21 @@ Die App speichert Zugangscodes (`users.json`) und den Übersetzungs-Cache (`cach
 
 Ohne dieses Volume gehen Codes und Cache bei jedem Update verloren.
 
-Zugänge anlegen: mit dem Hauptpasswort anmelden, Tab „Favoriten“, „Zugänge verwalten“. Jede Person bekommt einen eigenen Code, den sie statt des Passworts eingibt. Sperren löscht den Code sofort.
+Zugänge anlegen: mit dem Hauptpasswort anmelden, Tab „Einstellungen“, „Zugänge verwalten“. Jede Person bekommt einen eigenen Code, den sie statt des Passworts eingibt. Sperren löscht den Code sofort.
+
+## Push-Mitteilungen für Chats (optional)
+
+Damit neue Chat-Nachrichten als Mitteilung (mit Zahl am App-Symbol) ankommen, braucht der Server einmalig ein eigenes Schlüsselpaar:
+
+1. Bei laufendem Container im Unraid-Terminal:
+
+       docker exec uebersetzer-pwa python -m backend.push
+
+2. Die drei ausgegebenen Zeilen (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) in die `.env` übernehmen, bei `VAPID_SUBJECT` die eigene Mail-Adresse eintragen. Der private Schlüssel gehört nur in die `.env`.
+3. Container neu starten: `docker compose up -d`.
+4. Auf jedem Handy: App vom Home-Bildschirm öffnen, Tab „Gespräch“ → „Chats“ → „Mitteilungen einschalten“ und erlauben. Auf dem iPhone geht das ab iOS 16.4 und nur in der App vom Home-Bildschirm, nicht in Safari.
+
+Die Schlüssel nicht mehr ändern: Neue Schlüssel machen alle Anmeldungen ungültig, dann muss jedes Handy Mitteilungen neu einschalten.
+
+Mitteilungen laufen über die Push-Dienste von Apple bzw. Google und enthalten Absender und Nachrichtentext (übersetzt in die Sprache des Empfängers).
+
