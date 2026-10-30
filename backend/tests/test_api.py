@@ -494,6 +494,18 @@ def test_push_subscribe_rules(web, vapid):
     assert web.post("/api/push/subscribe", json=sub).status_code == 401
 
 
+def test_push_subject_is_app_address(web, vapid, monkeypatch):
+    from backend import push
+
+    sub, _, _ = _device()
+    web.post("/api/push/subscribe", headers={**H, "Origin": "https://uebersetzer.example.de"}, json=sub)
+    stored = [s for s in push._load() if s["endpoint"] == sub["endpoint"]][0]
+    assert stored["subject"] == "https://uebersetzer.example.de"
+    assert push._subject("http://localhost:8000").startswith("mailto:")  # Apple lehnt localhost ab
+    monkeypatch.setenv("VAPID_SUBJECT", "mailto:ich@example.de")
+    assert push._subject("https://uebersetzer.example.de") == "mailto:ich@example.de"
+
+
 def test_push_on_new_chat_message(web, vapid, monkeypatch):
     import json
 

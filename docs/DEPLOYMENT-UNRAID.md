@@ -66,9 +66,13 @@ Damit neue Chat-Nachrichten als Mitteilung (mit Zahl am App-Symbol) ankommen, br
 
        docker exec uebersetzer-pwa python -m backend.push
 
-2. Die drei ausgegebenen Zeilen (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) in die `.env` übernehmen, bei `VAPID_SUBJECT` die eigene Mail-Adresse eintragen. Der private Schlüssel gehört nur in die `.env`.
+2. Die zwei ausgegebenen Zeilen (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`) in die `.env` übernehmen. Der private Schlüssel gehört nur in die `.env`.
 3. Container neu starten: `docker compose up -d`.
 4. Auf jedem Handy: App vom Home-Bildschirm öffnen, Tab „Gespräch“ → „Chats“ → „Mitteilungen einschalten“ und erlauben. Auf dem iPhone geht das ab iOS 16.4 und nur in der App vom Home-Bildschirm, nicht in Safari.
+
+Die Schlüssel gelten für den Server, nicht für ein Handy: Jede Person schaltet Mitteilungen auf ihrem eigenen Handy ein, iPhone und Android gemischt. Wer mehrere Geräte nutzt, bekommt die Mitteilung auf allen.
+
+Als Kontaktangabe für Apple und Google („subject“) verwendet der Server automatisch die HTTPS-Adresse der App. Es werden keine Mails verschickt. Nur falls der Push-Dienst das ablehnt, kann man in der `.env` eine eigene Angabe setzen, z. B. `VAPID_SUBJECT=https://uebersetzer.example.de`.
 
 Die Schlüssel nicht mehr ändern: Neue Schlüssel machen alle Anmeldungen ungültig, dann muss jedes Handy Mitteilungen neu einschalten.
 

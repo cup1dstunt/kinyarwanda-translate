@@ -1,7 +1,10 @@
 """Push-Mitteilungen (Web Push, RFC 8030/8291/8292) für neue Chat-Nachrichten.
 
 Jedes Gerät meldet eine Adresse bei Apple/Google/Mozilla an; der Server schickt dorthin eine
-verschlüsselte Mitteilung. Schlüssel erzeugen: `python -m backend.push` (Ausgabe in .env eintragen).
+verschlüsselte Mitteilung. Schlüssel erzeugen: `python -m backend.push` (die zwei Zeilen in .env eintragen).
+
+Der Push-Dienst verlangt eine Kontaktangabe des Absenders („subject“). Dafür nehmen wir die
+HTTPS-Adresse der App, die das Handy beim Einschalten mitschickt. Es werden keine Mails verschickt.
 """
 import base64
 import json
@@ -63,7 +66,17 @@ def _save(subs: list[dict]) -> None:
     tmp.replace(_file())
 
 
-def subscribe(name: str, endpoint: str, p256dh: str, auth: str) -> None:
+def _subject(origin: str) -> str:
+    """Kontaktangabe für den Push-Dienst: eigene Angabe aus .env, sonst die HTTPS-Adresse der App."""
+    if env("VAPID_SUBJECT"):
+        return env("VAPID_SUBJECT")
+    url = urlparse(origin or "")
+    if url.scheme == "https" and url.hostname and url.hostname != "localhost":
+        return f"https://{url.netloc}"
+    return "mailto:push@ikiraro.app"  # Rückfall; Apple lehnt localhost-Adressen ab
+
+
+def subscribe(name: str, endpoint: str, p256dh: str, auth: str, origin: str = "") -> None:
     url = urlparse(endpoint)
     host = url.hostname or ""
     if url.scheme != "https" or not any(host == h or host.endswith("." + h) for h in ALLOWED_HOSTS):
@@ -80,7 +93,8 @@ def subscribe(name: str, endpoint: str, p256dh: str, auth: str) -> None:
         if len(mine) >= MAX_PER_USER:  # älteste Geräte zuerst ersetzen
             oldest = min(mine, key=lambda s: s["created"])
             subs.remove(oldest)
-        subs.append({"name": name, "endpoint": endpoint, "p256dh": p256dh, "auth": auth, "created": int(time.time())})
+        subs.append({"name": name, "endpoint": endpoint, "p256dh": p256dh, "auth": auth,
+                     "subject": _subject(origin), "created": int(time.time())})
         _save(subs)
 
 
@@ -100,15 +114,15 @@ def encrypt(sub: dict, payload: bytes) -> bytes:
                             auth_secret=_b64decode(sub["auth"]), version="aes128gcm")
 
 
-def _vapid_headers(endpoint: str) -> dict:
+def _vapid_headers(endpoint: str, subject: str = "") -> dict:
     url = urlparse(endpoint)
-    claims = {"sub": env("VAPID_SUBJECT", "mailto:admin@example.com"), "aud": f"{url.scheme}://{url.netloc}",
+    claims = {"sub": env("VAPID_SUBJECT") or subject or _subject(""), "aud": f"{url.scheme}://{url.netloc}",
               "exp": int(time.time()) + 12 * 3600}
     return Vapid02.from_string(env("VAPID_PRIVATE_KEY")).sign(claims)
 
 
 def _deliver(sub: dict, payload: bytes, client: httpx.Client) -> int:
-    headers = {**_vapid_headers(sub["endpoint"]), "TTL": str(TTL_SECONDS), "Urgency": "high",
+    headers = {**_vapid_headers(sub["endpoint"], sub.get("subject", "")), "TTL": str(TTL_SECONDS), "Urgency": "high",
                "Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream"}
     return client.post(sub["endpoint"], content=encrypt(sub, payload), headers=headers, timeout=10).status_code
 
@@ -146,4 +160,4 @@ def generate_keys() -> tuple[str, str]:
 
 if __name__ == "__main__":
     pub, priv = generate_keys()
-    print(f"VAPID_PUBLIC_KEY={pub}\nVAPID_PRIVATE_KEY={priv}\nVAPID_SUBJECT=mailto:deine@adresse.de")
+    print(f"VAPID_PUBLIC_KEY={pub}\nVAPID_PRIVATE_KEY={priv}")

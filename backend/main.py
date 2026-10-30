@@ -410,13 +410,13 @@ def notify_chat(chat_id: str, msg_id: int, sender: str) -> None:
 
 
 @app.post("/api/push/subscribe")
-def push_subscribe(req: PushSubscription, user: users.User = Depends(require_password)):
+def push_subscribe(req: PushSubscription, request: Request, user: users.User = Depends(require_password)):
     if not push.enabled():
         raise HTTPException(503, "Mitteilungen sind auf dem Server nicht eingerichtet")
     if req.keys is None:
         raise HTTPException(400, "Ungültige Anmeldung für Mitteilungen")
     try:
-        push.subscribe(user.name, req.endpoint, req.keys.p256dh, req.keys.auth)
+        push.subscribe(user.name, req.endpoint, req.keys.p256dh, req.keys.auth, request.headers.get("origin", ""))
     except push.PushError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True}
