@@ -1,0 +1,1913 @@
+[
+{
+"c": "Zahlen",
+"de": "eins",
+"fr": "un",
+"en": "one",
+"rw": "rimwe"
+},
+{
+"c": "Zahlen",
+"de": "zwei",
+"fr": "deux",
+"en": "two",
+"rw": "kabiri"
+},
+{
+"c": "Zahlen",
+"de": "drei",
+"fr": "trois",
+"en": "three",
+"rw": "gatatu"
+},
+{
+"c": "Zahlen",
+"de": "vier",
+"fr": "quatre",
+"en": "four",
+"rw": "kane"
+},
+{
+"c": "Zahlen",
+"de": "fünf",
+"fr": "cinq",
+"en": "five",
+"rw": "gatanu"
+},
+{
+"c": "Zahlen",
+"de": "sechs",
+"fr": "six",
+"en": "six",
+"rw": "gatandatu"
+},
+{
+"c": "Zahlen",
+"de": "sieben",
+"fr": "sept",
+"en": "seven",
+"rw": "karindwi"
+},
+{
+"c": "Zahlen",
+"de": "acht",
+"fr": "huit",
+"en": "eight",
+"rw": "umunani"
+},
+{
+"c": "Zahlen",
+"de": "neun",
+"fr": "neuf",
+"en": "nine",
+"rw": "icyenda"
+},
+{
+"c": "Zahlen",
+"de": "zehn",
+"fr": "dix",
+"en": "ten",
+"rw": "icumi"
+},
+{
+"c": "Zahlen",
+"de": "zwanzig",
+"fr": "vingt",
+"en": "twenty",
+"rw": "makumyabiri"
+},
+{
+"c": "Zahlen",
+"de": "fünfzig",
+"fr": "cinquante",
+"en": "fifty",
+"rw": "mirongo itanu"
+},
+{
+"c": "Zahlen",
+"de": "hundert",
+"fr": "cent",
+"en": "one hundred",
+"rw": "ijana"
+},
+{
+"c": "Zahlen",
+"de": "tausend",
+"fr": "mille",
+"en": "one thousand",
+"rw": "igihumbi"
+},
+{
+"c": "Zahlen",
+"de": "zehntausend",
+"fr": "dix mille",
+"en": "ten thousand",
+"rw": "ibihumbi icumi"
+},
+{
+"c": "Zahlen",
+"de": "die Hälfte",
+"fr": "la moitié",
+"en": "half",
+"rw": "kimwe cya kabiri"
+},
+{
+"c": "Zeit & Datum",
+"de": "heute",
+"fr": "aujourd'hui",
+"en": "today",
+"rw": "uyu munsi"
+},
+{
+"c": "Zeit & Datum",
+"de": "morgen",
+"fr": "demain",
+"en": "tomorrow",
+"rw": "ejo"
+},
+{
+"c": "Zeit & Datum",
+"de": "gestern",
+"fr": "hier",
+"en": "yesterday",
+"rw": "ejo hashize"
+},
+{
+"c": "Zeit & Datum",
+"de": "jetzt",
+"fr": "maintenant",
+"en": "now",
+"rw": "ubu"
+},
+{
+"c": "Zeit & Datum",
+"de": "später",
+"fr": "plus tard",
+"en": "later",
+"rw": "nyuma"
+},
+{
+"c": "Zeit & Datum",
+"de": "immer",
+"fr": "toujours",
+"en": "always",
+"rw": "buri gihe"
+},
+{
+"c": "Zeit & Datum",
+"de": "nie",
+"fr": "jamais",
+"en": "never",
+"rw": "ntabwo"
+},
+{
+"c": "Zeit & Datum",
+"de": "am Morgen",
+"fr": "le matin",
+"en": "in the morning",
+"rw": "mu gitondo"
+},
+{
+"c": "Zeit & Datum",
+"de": "am Abend",
+"fr": "le soir",
+"en": "in the evening",
+"rw": "nimugoroba"
+},
+{
+"c": "Zeit & Datum",
+"de": "Nacht",
+"fr": "nuit",
+"en": "night",
+"rw": "ijoro"
+},
+{
+"c": "Zeit & Datum",
+"de": "Stunde",
+"fr": "heure",
+"en": "hour",
+"rw": "isaha"
+},
+{
+"c": "Zeit & Datum",
+"de": "Minute",
+"fr": "minute",
+"en": "minute",
+"rw": "umunota"
+},
+{
+"c": "Zeit & Datum",
+"de": "Tag",
+"fr": "jour",
+"en": "day",
+"rw": "umunsi"
+},
+{
+"c": "Zeit & Datum",
+"de": "Woche",
+"fr": "semaine",
+"en": "week",
+"rw": "icyumweru"
+},
+{
+"c": "Zeit & Datum",
+"de": "Monat",
+"fr": "mois",
+"en": "month",
+"rw": "ukwezi"
+},
+{
+"c": "Zeit & Datum",
+"de": "Jahr",
+"fr": "an / année",
+"en": "year",
+"rw": "umwaka"
+},
+{
+"c": "Zeit & Datum",
+"de": "Montag",
+"fr": "lundi",
+"en": "Monday",
+"rw": "kuwa mbere"
+},
+{
+"c": "Zeit & Datum",
+"de": "Dienstag",
+"fr": "mardi",
+"en": "Tuesday",
+"rw": "kuwa kabiri"
+},
+{
+"c": "Zeit & Datum",
+"de": "Mittwoch",
+"fr": "mercredi",
+"en": "Wednesday",
+"rw": "kuwa gatatu"
+},
+{
+"c": "Zeit & Datum",
+"de": "Donnerstag",
+"fr": "jeudi",
+"en": "Thursday",
+"rw": "kuwa kane"
+},
+{
+"c": "Zeit & Datum",
+"de": "Freitag",
+"fr": "vendredi",
+"en": "Friday",
+"rw": "kuwa gatanu"
+},
+{
+"c": "Zeit & Datum",
+"de": "Samstag",
+"fr": "samedi",
+"en": "Saturday",
+"rw": "kuwa gatandatu"
+},
+{
+"c": "Zeit & Datum",
+"de": "Sonntag",
+"fr": "dimanche",
+"en": "Sunday",
+"rw": "ku cyumweru"
+},
+{
+"c": "Zeit & Datum",
+"de": "Wie spät ist es?",
+"fr": "Quelle heure est-il ?",
+"en": "What time is it?",
+"rw": "Ni saa ngahe?"
+},
+{
+"c": "Zeit & Datum",
+"de": "Bis morgen",
+"fr": "À demain",
+"en": "See you tomorrow",
+"rw": "Tuzabonana ejo"
+},
+{
+"c": "Zeit & Datum",
+"de": "Bis später",
+"fr": "À plus tard",
+"en": "See you later",
+"rw": "Tuzabonana nyuma"
+},
+{
+"c": "Familie & Leute",
+"de": "Mutter",
+"fr": "mère",
+"en": "mother",
+"rw": "mama"
+},
+{
+"c": "Familie & Leute",
+"de": "Vater",
+"fr": "père",
+"en": "father",
+"rw": "papa"
+},
+{
+"c": "Familie & Leute",
+"de": "Kind",
+"fr": "enfant",
+"en": "child",
+"rw": "umwana"
+},
+{
+"c": "Familie & Leute",
+"de": "Sohn",
+"fr": "fils",
+"en": "son",
+"rw": "umuhungu"
+},
+{
+"c": "Familie & Leute",
+"de": "Tochter",
+"fr": "fille",
+"en": "daughter",
+"rw": "umukobwa"
+},
+{
+"c": "Familie & Leute",
+"de": "Bruder / Schwester",
+"fr": "frère / sœur",
+"en": "brother / sister",
+"rw": "umuvandimwe"
+},
+{
+"c": "Familie & Leute",
+"de": "Großmutter",
+"fr": "grand-mère",
+"en": "grandmother",
+"rw": "nyogokuru"
+},
+{
+"c": "Familie & Leute",
+"de": "Großvater",
+"fr": "grand-père",
+"en": "grandfather",
+"rw": "sogokuru"
+},
+{
+"c": "Familie & Leute",
+"de": "Mann",
+"fr": "homme",
+"en": "man",
+"rw": "umugabo"
+},
+{
+"c": "Familie & Leute",
+"de": "Frau",
+"fr": "femme",
+"en": "woman",
+"rw": "umugore"
+},
+{
+"c": "Familie & Leute",
+"de": "Freund / Freundin",
+"fr": "ami / amie",
+"en": "friend",
+"rw": "inshuti"
+},
+{
+"c": "Familie & Leute",
+"de": "Familie",
+"fr": "famille",
+"en": "family",
+"rw": "umuryango"
+},
+{
+"c": "Familie & Leute",
+"de": "Ehemann",
+"fr": "mari",
+"en": "husband",
+"rw": "umugabo wanjye"
+},
+{
+"c": "Familie & Leute",
+"de": "Ehefrau",
+"fr": "épouse",
+"en": "wife",
+"rw": "umugore wanjye"
+},
+{
+"c": "Familie & Leute",
+"de": "Baby",
+"fr": "bébé",
+"en": "baby",
+"rw": "uruhinja"
+},
+{
+"c": "Familie & Leute",
+"de": "Lehrer / Lehrerin",
+"fr": "professeur",
+"en": "teacher",
+"rw": "umwarimu"
+},
+{
+"c": "Familie & Leute",
+"de": "Nachbar",
+"fr": "voisin",
+"en": "neighbor",
+"rw": "umuturanyi"
+},
+{
+"c": "Familie & Leute",
+"de": "Gast",
+"fr": "invité",
+"en": "guest",
+"rw": "umushyitsi"
+},
+{
+"c": "Familie & Leute",
+"de": "Wie heißt du?",
+"fr": "Comment t'appelles-tu ?",
+"en": "What is your name?",
+"rw": "Witwa nde?"
+},
+{
+"c": "Familie & Leute",
+"de": "Wie alt bist du?",
+"fr": "Quel âge as-tu ?",
+"en": "How old are you?",
+"rw": "Ufite imyaka ingahe?"
+},
+{
+"c": "Familie & Leute",
+"de": "Wo wohnst du?",
+"fr": "Où habites-tu ?",
+"en": "Where do you live?",
+"rw": "Utuye he?"
+},
+{
+"c": "Familie & Leute",
+"de": "Ich spreche nur wenig Kinyarwanda",
+"fr": "Je parle un peu le kinyarwanda",
+"en": "I speak only a little Kinyarwanda",
+"rw": "Mvuga Ikinyarwanda gike"
+},
+{
+"c": "Familie & Leute",
+"de": "Ich liebe dich",
+"fr": "Je t'aime",
+"en": "I love you",
+"rw": "Ndagukunda"
+},
+{
+"c": "Familie & Leute",
+"de": "Ich vermisse dich",
+"fr": "Tu me manques",
+"en": "I miss you",
+"rw": "Ndagukumbuye"
+},
+{
+"c": "Essen & Trinken",
+"de": "Wasser",
+"fr": "eau",
+"en": "water",
+"rw": "amazi"
+},
+{
+"c": "Essen & Trinken",
+"de": "Bier",
+"fr": "bière",
+"en": "beer",
+"rw": "byeri"
+},
+{
+"c": "Essen & Trinken",
+"de": "Kaffee",
+"fr": "café",
+"en": "coffee",
+"rw": "ikawa"
+},
+{
+"c": "Essen & Trinken",
+"de": "Tee",
+"fr": "thé",
+"en": "tea",
+"rw": "icyayi"
+},
+{
+"c": "Essen & Trinken",
+"de": "Milch",
+"fr": "lait",
+"en": "milk",
+"rw": "amata"
+},
+{
+"c": "Essen & Trinken",
+"de": "Saft",
+"fr": "jus",
+"en": "juice",
+"rw": "umutobe"
+},
+{
+"c": "Essen & Trinken",
+"de": "Brot",
+"fr": "pain",
+"en": "bread",
+"rw": "umugati"
+},
+{
+"c": "Essen & Trinken",
+"de": "Reis",
+"fr": "riz",
+"en": "rice",
+"rw": "umuceri"
+},
+{
+"c": "Essen & Trinken",
+"de": "Bohnen",
+"fr": "haricots",
+"en": "beans",
+"rw": "ibishyimbo"
+},
+{
+"c": "Essen & Trinken",
+"de": "Fleisch",
+"fr": "viande",
+"en": "meat",
+"rw": "inyama"
+},
+{
+"c": "Essen & Trinken",
+"de": "Fisch",
+"fr": "poisson",
+"en": "fish",
+"rw": "ifi"
+},
+{
+"c": "Essen & Trinken",
+"de": "Hähnchen",
+"fr": "poulet",
+"en": "chicken",
+"rw": "inkoko"
+},
+{
+"c": "Essen & Trinken",
+"de": "Ei",
+"fr": "œuf",
+"en": "egg",
+"rw": "igi"
+},
+{
+"c": "Essen & Trinken",
+"de": "Kartoffeln",
+"fr": "pommes de terre",
+"en": "potatoes",
+"rw": "ibirayi"
+},
+{
+"c": "Essen & Trinken",
+"de": "Maniok",
+"fr": "manioc",
+"en": "cassava",
+"rw": "imyumbati"
+},
+{
+"c": "Essen & Trinken",
+"de": "Mais",
+"fr": "maïs",
+"en": "maize",
+"rw": "ibigori"
+},
+{
+"c": "Essen & Trinken",
+"de": "Kochbananen",
+"fr": "bananes plantains",
+"en": "cooking bananas",
+"rw": "ibitoki"
+},
+{
+"c": "Essen & Trinken",
+"de": "Tomate",
+"fr": "tomate",
+"en": "tomato",
+"rw": "inyanya"
+},
+{
+"c": "Essen & Trinken",
+"de": "Zwiebel",
+"fr": "oignon",
+"en": "onion",
+"rw": "igitunguru"
+},
+{
+"c": "Essen & Trinken",
+"de": "Gemüse",
+"fr": "légumes",
+"en": "vegetables",
+"rw": "imboga"
+},
+{
+"c": "Essen & Trinken",
+"de": "Obst",
+"fr": "fruits",
+"en": "fruit",
+"rw": "imbuto"
+},
+{
+"c": "Essen & Trinken",
+"de": "Mango",
+"fr": "mangue",
+"en": "mango",
+"rw": "umwembe"
+},
+{
+"c": "Essen & Trinken",
+"de": "Ananas",
+"fr": "ananas",
+"en": "pineapple",
+"rw": "inanasi"
+},
+{
+"c": "Essen & Trinken",
+"de": "Avocado",
+"fr": "avocat",
+"en": "avocado",
+"rw": "avoka"
+},
+{
+"c": "Essen & Trinken",
+"de": "Suppe",
+"fr": "soupe",
+"en": "soup",
+"rw": "isupu"
+},
+{
+"c": "Essen & Trinken",
+"de": "Salz",
+"fr": "sel",
+"en": "salt",
+"rw": "umunyu"
+},
+{
+"c": "Essen & Trinken",
+"de": "Zucker",
+"fr": "sucre",
+"en": "sugar",
+"rw": "isukari"
+},
+{
+"c": "Essen & Trinken",
+"de": "Frühstück",
+"fr": "petit-déjeuner",
+"en": "breakfast",
+"rw": "ifunguro rya mu gitondo"
+},
+{
+"c": "Essen & Trinken",
+"de": "Mittagessen",
+"fr": "déjeuner",
+"en": "lunch",
+"rw": "ifunguro rya saa sita"
+},
+{
+"c": "Essen & Trinken",
+"de": "Abendessen",
+"fr": "dîner",
+"en": "dinner",
+"rw": "ifunguro rya nimugoroba"
+},
+{
+"c": "Essen & Trinken",
+"de": "Ich habe Hunger",
+"fr": "J'ai faim",
+"en": "I am hungry",
+"rw": "Mfite inzara"
+},
+{
+"c": "Essen & Trinken",
+"de": "Ich habe Durst",
+"fr": "J'ai soif",
+"en": "I am thirsty",
+"rw": "Mfite inyota"
+},
+{
+"c": "Essen & Trinken",
+"de": "Es schmeckt gut",
+"fr": "C'est délicieux",
+"en": "It tastes good",
+"rw": "Biraryoshye"
+},
+{
+"c": "Essen & Trinken",
+"de": "Guten Appetit",
+"fr": "Bon appétit",
+"en": "Enjoy your meal",
+"rw": "Mwiryoherwe"
+},
+{
+"c": "Essen & Trinken",
+"de": "Die Rechnung bitte",
+"fr": "L'addition, s'il vous plaît",
+"en": "The bill, please",
+"rw": "Mumpe fagitire"
+},
+{
+"c": "Essen & Trinken",
+"de": "Ich esse kein Fleisch",
+"fr": "Je ne mange pas de viande",
+"en": "I don't eat meat",
+"rw": "Ntarya inyama"
+},
+{
+"c": "Essen & Trinken",
+"de": "Ich möchte einen Kaffee",
+"fr": "Je voudrais un café",
+"en": "I would like a coffee",
+"rw": "Ndashaka ikawa"
+},
+{
+"c": "Essen & Trinken",
+"de": "Noch ein Bier, bitte",
+"fr": "Une autre bière, s'il vous plaît",
+"en": "Another beer, please",
+"rw": "Ndashaka ikindi byeri"
+},
+{
+"c": "Essen & Trinken",
+"de": "Prost",
+"fr": "Santé",
+"en": "Cheers",
+"rw": "Ku buzima bwanyu"
+},
+{
+"c": "Körper",
+"de": "Kopf",
+"fr": "tête",
+"en": "head",
+"rw": "umutwe"
+},
+{
+"c": "Körper",
+"de": "Auge",
+"fr": "œil",
+"en": "eye",
+"rw": "ijisho"
+},
+{
+"c": "Körper",
+"de": "Nase",
+"fr": "nez",
+"en": "nose",
+"rw": "izuru"
+},
+{
+"c": "Körper",
+"de": "Mund",
+"fr": "bouche",
+"en": "mouth",
+"rw": "umunwa"
+},
+{
+"c": "Körper",
+"de": "Ohr",
+"fr": "oreille",
+"en": "ear",
+"rw": "ugutwi"
+},
+{
+"c": "Körper",
+"de": "Zahn",
+"fr": "dent",
+"en": "tooth",
+"rw": "iryinyo"
+},
+{
+"c": "Körper",
+"de": "Hals",
+"fr": "cou / gorge",
+"en": "neck / throat",
+"rw": "ijosi"
+},
+{
+"c": "Körper",
+"de": "Haar",
+"fr": "cheveux",
+"en": "hair",
+"rw": "umusatsi"
+},
+{
+"c": "Körper",
+"de": "Arm",
+"fr": "bras",
+"en": "arm",
+"rw": "ukuboko"
+},
+{
+"c": "Körper",
+"de": "Hand",
+"fr": "main",
+"en": "hand",
+"rw": "ikiganza"
+},
+{
+"c": "Körper",
+"de": "Bein",
+"fr": "jambe",
+"en": "leg",
+"rw": "ukuguru"
+},
+{
+"c": "Körper",
+"de": "Fuß",
+"fr": "pied",
+"en": "foot",
+"rw": "ikirenge"
+},
+{
+"c": "Körper",
+"de": "Rücken",
+"fr": "dos",
+"en": "back",
+"rw": "umugongo"
+},
+{
+"c": "Körper",
+"de": "Bauch",
+"fr": "ventre",
+"en": "belly",
+"rw": "inda"
+},
+{
+"c": "Körper",
+"de": "Herz",
+"fr": "cœur",
+"en": "heart",
+"rw": "umutima"
+},
+{
+"c": "Körper",
+"de": "Blut",
+"fr": "sang",
+"en": "blood",
+"rw": "amaraso"
+},
+{
+"c": "Körper",
+"de": "Ich habe Zahnschmerzen",
+"fr": "J'ai mal aux dents",
+"en": "I have a toothache",
+"rw": "Ndwaye iryinyo"
+},
+{
+"c": "Körper",
+"de": "Ich habe Husten",
+"fr": "Je tousse",
+"en": "I have a cough",
+"rw": "Ndakorora"
+},
+{
+"c": "Körper",
+"de": "Ich bin krank",
+"fr": "Je suis malade",
+"en": "I am sick",
+"rw": "Ndarwaye"
+},
+{
+"c": "Verben",
+"de": "essen",
+"fr": "manger",
+"en": "to eat",
+"rw": "kurya"
+},
+{
+"c": "Verben",
+"de": "trinken",
+"fr": "boire",
+"en": "to drink",
+"rw": "kunywa"
+},
+{
+"c": "Verben",
+"de": "gehen",
+"fr": "aller",
+"en": "to go",
+"rw": "kugenda"
+},
+{
+"c": "Verben",
+"de": "kommen",
+"fr": "venir",
+"en": "to come",
+"rw": "kuza"
+},
+{
+"c": "Verben",
+"de": "sehen",
+"fr": "voir",
+"en": "to see",
+"rw": "kureba"
+},
+{
+"c": "Verben",
+"de": "hören",
+"fr": "entendre",
+"en": "to hear",
+"rw": "kumva"
+},
+{
+"c": "Verben",
+"de": "sprechen",
+"fr": "parler",
+"en": "to speak",
+"rw": "kuvuga"
+},
+{
+"c": "Verben",
+"de": "schlafen",
+"fr": "dormir",
+"en": "to sleep",
+"rw": "gusinzira"
+},
+{
+"c": "Verben",
+"de": "arbeiten",
+"fr": "travailler",
+"en": "to work",
+"rw": "gukora"
+},
+{
+"c": "Verben",
+"de": "kaufen",
+"fr": "acheter",
+"en": "to buy",
+"rw": "kugura"
+},
+{
+"c": "Verben",
+"de": "verkaufen",
+"fr": "vendre",
+"en": "to sell",
+"rw": "kugurisha"
+},
+{
+"c": "Verben",
+"de": "geben",
+"fr": "donner",
+"en": "to give",
+"rw": "guha"
+},
+{
+"c": "Verben",
+"de": "nehmen",
+"fr": "prendre",
+"en": "to take",
+"rw": "gufata"
+},
+{
+"c": "Verben",
+"de": "wollen",
+"fr": "vouloir",
+"en": "to want",
+"rw": "gushaka"
+},
+{
+"c": "Verben",
+"de": "wissen",
+"fr": "savoir",
+"en": "to know",
+"rw": "kumenya"
+},
+{
+"c": "Verben",
+"de": "lieben / mögen",
+"fr": "aimer",
+"en": "to love / to like",
+"rw": "gukunda"
+},
+{
+"c": "Verben",
+"de": "lernen",
+"fr": "apprendre",
+"en": "to learn",
+"rw": "kwiga"
+},
+{
+"c": "Verben",
+"de": "helfen",
+"fr": "aider",
+"en": "to help",
+"rw": "gufasha"
+},
+{
+"c": "Verben",
+"de": "warten",
+"fr": "attendre",
+"en": "to wait",
+"rw": "gutegereza"
+},
+{
+"c": "Verben",
+"de": "bezahlen",
+"fr": "payer",
+"en": "to pay",
+"rw": "kwishyura"
+},
+{
+"c": "Verben",
+"de": "anrufen",
+"fr": "appeler",
+"en": "to call",
+"rw": "guhamagara"
+},
+{
+"c": "Verben",
+"de": "schreiben",
+"fr": "écrire",
+"en": "to write",
+"rw": "kwandika"
+},
+{
+"c": "Verben",
+"de": "lesen",
+"fr": "lire",
+"en": "to read",
+"rw": "gusoma"
+},
+{
+"c": "Verben",
+"de": "öffnen",
+"fr": "ouvrir",
+"en": "to open",
+"rw": "gufungura"
+},
+{
+"c": "Verben",
+"de": "schließen",
+"fr": "fermer",
+"en": "to close",
+"rw": "gufunga"
+},
+{
+"c": "Verben",
+"de": "kochen",
+"fr": "cuisiner",
+"en": "to cook",
+"rw": "guteka"
+},
+{
+"c": "Verben",
+"de": "tanzen",
+"fr": "danser",
+"en": "to dance",
+"rw": "kubyina"
+},
+{
+"c": "Verben",
+"de": "singen",
+"fr": "chanter",
+"en": "to sing",
+"rw": "kuririmba"
+},
+{
+"c": "Verben",
+"de": "spielen",
+"fr": "jouer",
+"en": "to play",
+"rw": "gukina"
+},
+{
+"c": "Verben",
+"de": "lachen",
+"fr": "rire",
+"en": "to laugh",
+"rw": "guseka"
+},
+{
+"c": "Verben",
+"de": "fragen",
+"fr": "demander",
+"en": "to ask",
+"rw": "kubaza"
+},
+{
+"c": "Verben",
+"de": "antworten",
+"fr": "répondre",
+"en": "to answer",
+"rw": "gusubiza"
+},
+{
+"c": "Verben",
+"de": "brauchen",
+"fr": "avoir besoin de",
+"en": "to need",
+"rw": "gukenera"
+},
+{
+"c": "Verben",
+"de": "bleiben",
+"fr": "rester",
+"en": "to stay",
+"rw": "kuguma"
+},
+{
+"c": "Orte",
+"de": "Haus",
+"fr": "maison",
+"en": "house",
+"rw": "inzu"
+},
+{
+"c": "Orte",
+"de": "Stadt",
+"fr": "ville",
+"en": "city",
+"rw": "umujyi"
+},
+{
+"c": "Orte",
+"de": "Dorf",
+"fr": "village",
+"en": "village",
+"rw": "umudugudu"
+},
+{
+"c": "Orte",
+"de": "Straße",
+"fr": "rue / route",
+"en": "street / road",
+"rw": "umuhanda"
+},
+{
+"c": "Orte",
+"de": "Markt",
+"fr": "marché",
+"en": "market",
+"rw": "isoko"
+},
+{
+"c": "Orte",
+"de": "Geschäft",
+"fr": "magasin",
+"en": "shop",
+"rw": "iduka"
+},
+{
+"c": "Orte",
+"de": "Schule",
+"fr": "école",
+"en": "school",
+"rw": "ishuri"
+},
+{
+"c": "Orte",
+"de": "Krankenhaus",
+"fr": "hôpital",
+"en": "hospital",
+"rw": "ibitaro"
+},
+{
+"c": "Orte",
+"de": "Kirche",
+"fr": "église",
+"en": "church",
+"rw": "itorero"
+},
+{
+"c": "Orte",
+"de": "Hotel",
+"fr": "hôtel",
+"en": "hotel",
+"rw": "hoteli"
+},
+{
+"c": "Orte",
+"de": "Restaurant",
+"fr": "restaurant",
+"en": "restaurant",
+"rw": "resitora"
+},
+{
+"c": "Orte",
+"de": "Bank",
+"fr": "banque",
+"en": "bank",
+"rw": "banki"
+},
+{
+"c": "Orte",
+"de": "Polizei",
+"fr": "police",
+"en": "police",
+"rw": "polisi"
+},
+{
+"c": "Orte",
+"de": "Flughafen",
+"fr": "aéroport",
+"en": "airport",
+"rw": "ikibuga cy'indege"
+},
+{
+"c": "Orte",
+"de": "Busbahnhof",
+"fr": "gare routière",
+"en": "bus station",
+"rw": "gare"
+},
+{
+"c": "Orte",
+"de": "Land",
+"fr": "pays",
+"en": "country",
+"rw": "igihugu"
+},
+{
+"c": "Orte",
+"de": "Ruanda",
+"fr": "Rwanda",
+"en": "Rwanda",
+"rw": "u Rwanda"
+},
+{
+"c": "Orte",
+"de": "Deutschland",
+"fr": "Allemagne",
+"en": "Germany",
+"rw": "Ubudage"
+},
+{
+"c": "Orte",
+"de": "Frankreich",
+"fr": "France",
+"en": "France",
+"rw": "Ubufaransa"
+},
+{
+"c": "Orte",
+"de": "England",
+"fr": "Angleterre",
+"en": "England",
+"rw": "Ubwongereza"
+},
+{
+"c": "Orte",
+"de": "Wo ist die Bank?",
+"fr": "Où est la banque ?",
+"en": "Where is the bank?",
+"rw": "Banki iri he?"
+},
+{
+"c": "Orte",
+"de": "Wo ist das Krankenhaus?",
+"fr": "Où est l'hôpital ?",
+"en": "Where is the hospital?",
+"rw": "Ibitaro biri he?"
+},
+{
+"c": "Orte",
+"de": "Wo ist der Markt?",
+"fr": "Où est le marché ?",
+"en": "Where is the market?",
+"rw": "Isoko riri he?"
+},
+{
+"c": "Verkehr",
+"de": "Bus",
+"fr": "bus",
+"en": "bus",
+"rw": "bisi"
+},
+{
+"c": "Verkehr",
+"de": "Auto",
+"fr": "voiture",
+"en": "car",
+"rw": "imodoka"
+},
+{
+"c": "Verkehr",
+"de": "Motorradtaxi",
+"fr": "moto-taxi",
+"en": "motorbike taxi",
+"rw": "moto"
+},
+{
+"c": "Verkehr",
+"de": "Taxi",
+"fr": "taxi",
+"en": "taxi",
+"rw": "tagisi"
+},
+{
+"c": "Verkehr",
+"de": "Fahrrad",
+"fr": "vélo",
+"en": "bicycle",
+"rw": "igare"
+},
+{
+"c": "Verkehr",
+"de": "Flugzeug",
+"fr": "avion",
+"en": "airplane",
+"rw": "indege"
+},
+{
+"c": "Verkehr",
+"de": "Fahrkarte",
+"fr": "billet",
+"en": "ticket",
+"rw": "itike"
+},
+{
+"c": "Verkehr",
+"de": "Haltestelle",
+"fr": "arrêt",
+"en": "stop",
+"rw": "aho bategera"
+},
+{
+"c": "Verkehr",
+"de": "Ich möchte nach Kigali",
+"fr": "Je voudrais aller à Kigali",
+"en": "I would like to go to Kigali",
+"rw": "Ndashaka kujya i Kigali"
+},
+{
+"c": "Verkehr",
+"de": "Wann fährt der Bus?",
+"fr": "Quand part le bus ?",
+"en": "When does the bus leave?",
+"rw": "Bisi igenda ryari?"
+},
+{
+"c": "Verkehr",
+"de": "Wo ist die Bushaltestelle?",
+"fr": "Où est l'arrêt de bus ?",
+"en": "Where is the bus stop?",
+"rw": "Aho bategera bisi ni he?"
+},
+{
+"c": "Verkehr",
+"de": "Fahren Sie langsam",
+"fr": "Roulez doucement",
+"en": "Please drive slowly",
+"rw": "Mugende buhoro"
+},
+{
+"c": "Wetter & Natur",
+"de": "Regen",
+"fr": "pluie",
+"en": "rain",
+"rw": "imvura"
+},
+{
+"c": "Wetter & Natur",
+"de": "Sonne",
+"fr": "soleil",
+"en": "sun",
+"rw": "izuba"
+},
+{
+"c": "Wetter & Natur",
+"de": "Wind",
+"fr": "vent",
+"en": "wind",
+"rw": "umuyaga"
+},
+{
+"c": "Wetter & Natur",
+"de": "Wolke",
+"fr": "nuage",
+"en": "cloud",
+"rw": "igicu"
+},
+{
+"c": "Wetter & Natur",
+"de": "heiß",
+"fr": "chaud",
+"en": "hot",
+"rw": "birashyushye"
+},
+{
+"c": "Wetter & Natur",
+"de": "kalt",
+"fr": "froid",
+"en": "cold",
+"rw": "birakonje"
+},
+{
+"c": "Wetter & Natur",
+"de": "Es regnet",
+"fr": "Il pleut",
+"en": "It is raining",
+"rw": "Imvura iragwa"
+},
+{
+"c": "Wetter & Natur",
+"de": "Berg",
+"fr": "montagne",
+"en": "mountain",
+"rw": "umusozi"
+},
+{
+"c": "Wetter & Natur",
+"de": "See",
+"fr": "lac",
+"en": "lake",
+"rw": "ikiyaga"
+},
+{
+"c": "Wetter & Natur",
+"de": "Fluss",
+"fr": "rivière",
+"en": "river",
+"rw": "uruzi"
+},
+{
+"c": "Wetter & Natur",
+"de": "Baum",
+"fr": "arbre",
+"en": "tree",
+"rw": "igiti"
+},
+{
+"c": "Wetter & Natur",
+"de": "Blume",
+"fr": "fleur",
+"en": "flower",
+"rw": "ururabo"
+},
+{
+"c": "Wetter & Natur",
+"de": "Tier",
+"fr": "animal",
+"en": "animal",
+"rw": "itungo"
+},
+{
+"c": "Wetter & Natur",
+"de": "Kuh",
+"fr": "vache",
+"en": "cow",
+"rw": "inka"
+},
+{
+"c": "Wetter & Natur",
+"de": "Hund",
+"fr": "chien",
+"en": "dog",
+"rw": "imbwa"
+},
+{
+"c": "Wetter & Natur",
+"de": "Katze",
+"fr": "chat",
+"en": "cat",
+"rw": "injangwe"
+},
+{
+"c": "Wetter & Natur",
+"de": "Vogel",
+"fr": "oiseau",
+"en": "bird",
+"rw": "inyoni"
+},
+{
+"c": "Wetter & Natur",
+"de": "Gorilla",
+"fr": "gorille",
+"en": "gorilla",
+"rw": "ingagi"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Hemd",
+"fr": "chemise",
+"en": "shirt",
+"rw": "ishati"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Hose",
+"fr": "pantalon",
+"en": "trousers",
+"rw": "ipantaro"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Kleid",
+"fr": "robe",
+"en": "dress",
+"rw": "ikanzu"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Schuhe",
+"fr": "chaussures",
+"en": "shoes",
+"rw": "inkweto"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Jacke",
+"fr": "veste",
+"en": "jacket",
+"rw": "ikoti"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Hut",
+"fr": "chapeau",
+"en": "hat",
+"rw": "ingofero"
+},
+{
+"c": "Kleidung & Farben",
+"de": "rot",
+"fr": "rouge",
+"en": "red",
+"rw": "umutuku"
+},
+{
+"c": "Kleidung & Farben",
+"de": "blau",
+"fr": "bleu",
+"en": "blue",
+"rw": "ubururu"
+},
+{
+"c": "Kleidung & Farben",
+"de": "grün",
+"fr": "vert",
+"en": "green",
+"rw": "icyatsi"
+},
+{
+"c": "Kleidung & Farben",
+"de": "gelb",
+"fr": "jaune",
+"en": "yellow",
+"rw": "umuhondo"
+},
+{
+"c": "Kleidung & Farben",
+"de": "schwarz",
+"fr": "noir",
+"en": "black",
+"rw": "umukara"
+},
+{
+"c": "Kleidung & Farben",
+"de": "weiß",
+"fr": "blanc",
+"en": "white",
+"rw": "umweru"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Welche Größe haben Sie?",
+"fr": "Quelle taille avez-vous ?",
+"en": "What size do you have?",
+"rw": "Mufite ingano ingahe?"
+},
+{
+"c": "Kleidung & Farben",
+"de": "Kann ich das anprobieren?",
+"fr": "Puis-je l'essayer ?",
+"en": "Can I try this on?",
+"rw": "Nshobora kubigerageza?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Wer?",
+"fr": "Qui ?",
+"en": "Who?",
+"rw": "Ninde?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Was?",
+"fr": "Quoi ?",
+"en": "What?",
+"rw": "Iki?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Wo?",
+"fr": "Où ?",
+"en": "Where?",
+"rw": "He?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Wann?",
+"fr": "Quand ?",
+"en": "When?",
+"rw": "Ryari?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Warum?",
+"fr": "Pourquoi ?",
+"en": "Why?",
+"rw": "Kuki?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Wie?",
+"fr": "Comment ?",
+"en": "How?",
+"rw": "Gute?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Wie viel?",
+"fr": "Combien ?",
+"en": "How much / how many?",
+"rw": "Angahe?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Welche(r)?",
+"fr": "Lequel ?",
+"en": "Which?",
+"rw": "Ikihe?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "ich",
+"fr": "moi / je",
+"en": "I",
+"rw": "njyewe"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "du",
+"fr": "toi / tu",
+"en": "you",
+"rw": "wowe"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "er / sie",
+"fr": "il / elle",
+"en": "he / she",
+"rw": "we"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "wir",
+"fr": "nous",
+"en": "we",
+"rw": "twe"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "ihr",
+"fr": "vous",
+"en": "you (plural)",
+"rw": "mwe"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "sie (Mehrzahl)",
+"fr": "ils / elles",
+"en": "they",
+"rw": "bo"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "groß",
+"fr": "grand",
+"en": "big",
+"rw": "-nini"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "klein",
+"fr": "petit",
+"en": "small",
+"rw": "-to"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "gut",
+"fr": "bon",
+"en": "good",
+"rw": "-iza"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "schlecht",
+"fr": "mauvais",
+"en": "bad",
+"rw": "-bi"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "neu",
+"fr": "nouveau",
+"en": "new",
+"rw": "-shya"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "viel",
+"fr": "beaucoup",
+"en": "a lot",
+"rw": "byinshi"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "wenig",
+"fr": "peu",
+"en": "a little",
+"rw": "bike"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "schnell",
+"fr": "vite",
+"en": "fast",
+"rw": "vuba"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "langsam",
+"fr": "lentement",
+"en": "slow",
+"rw": "buhoro"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "teuer",
+"fr": "cher",
+"en": "expensive",
+"rw": "bihenze"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "billig",
+"fr": "bon marché",
+"en": "cheap",
+"rw": "bihendutse"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Ich weiß nicht",
+"fr": "Je ne sais pas",
+"en": "I don't know",
+"rw": "Simbizi"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Bitte sprechen Sie langsamer",
+"fr": "Parlez plus lentement, s'il vous plaît",
+"en": "Please speak more slowly",
+"rw": "Mwavuga buhoro?"
+},
+{
+"c": "Fragen & Grundwörter",
+"de": "Willkommen",
+"fr": "Bienvenue",
+"en": "Welcome",
+"rw": "Murakaza neza"
+},
+{
+"c": "Notfall",
+"de": "Hilfe!",
+"fr": "Au secours !",
+"en": "Help!",
+"rw": "Nimutabare!"
+},
+{
+"c": "Notfall",
+"de": "Ich brauche Hilfe",
+"fr": "J'ai besoin d'aide",
+"en": "I need help",
+"rw": "Nkeneye ubufasha"
+},
+{
+"c": "Notfall",
+"de": "Rufen Sie die Polizei",
+"fr": "Appelez la police",
+"en": "Call the police",
+"rw": "Muhamagare polisi"
+},
+{
+"c": "Notfall",
+"de": "Rufen Sie einen Krankenwagen",
+"fr": "Appelez une ambulance",
+"en": "Call an ambulance",
+"rw": "Muhamagare ambulance"
+},
+{
+"c": "Notfall",
+"de": "Ich wurde bestohlen",
+"fr": "On m'a volé",
+"en": "I have been robbed",
+"rw": "Banyibye"
+},
+{
+"c": "Notfall",
+"de": "Ich habe meinen Pass verloren",
+"fr": "J'ai perdu mon passeport",
+"en": "I lost my passport",
+"rw": "Napfushije pasiporo"
+},
+{
+"c": "Notfall",
+"de": "Feuer!",
+"fr": "Au feu !",
+"en": "Fire!",
+"rw": "Inkongi!"
+},
+{
+"c": "Alltagssprache",
+"de": "Frohe Weihnachten",
+"fr": "Joyeux Noël",
+"en": "Merry Christmas",
+"rw": "Noheli nziza"
+},
+{
+"c": "Alltagssprache",
+"de": "Frohes neues Jahr",
+"fr": "Bonne année",
+"en": "Happy New Year",
+"rw": "Umwaka mushya muhire"
+},
+{
+"c": "Alltagssprache",
+"de": "Herzlichen Glückwunsch",
+"fr": "Félicitations",
+"en": "Congratulations",
+"rw": "Ndabashimiye"
+},
+{
+"c": "Alltagssprache",
+"de": "Gute Reise",
+"fr": "Bon voyage",
+"en": "Have a good trip",
+"rw": "Urugendo rwiza"
+},
+{
+"c": "Alltagssprache",
+"de": "Viel Glück",
+"fr": "Bonne chance",
+"en": "Good luck",
+"rw": "Amahirwe masa"
+},
+{
+"c": "Alltagssprache",
+"de": "Das gefällt mir",
+"fr": "Ça me plaît",
+"en": "I like it",
+"rw": "Biranshimishije"
+},
+{
+"c": "Alltagssprache",
+"de": "Ich bin müde",
+"fr": "Je suis fatigué",
+"en": "I am tired",
+"rw": "Ndananiwe"
+},
+{
+"c": "Alltagssprache",
+"de": "Ich bin glücklich",
+"fr": "Je suis heureux",
+"en": "I am happy",
+"rw": "Ndishimye"
+},
+{
+"c": "Alltagssprache",
+"de": "Ich bin traurig",
+"fr": "Je suis triste",
+"en": "I am sad",
+"rw": "Ndababaye"
+},
+{
+"c": "Alltagssprache",
+"de": "Kein Problem",
+"fr": "Pas de problème",
+"en": "No problem",
+"rw": "Nta kibazo"
+},
+{
+"c": "Alltagssprache",
+"de": "Alles gut?",
+"fr": "Ça va ?",
+"en": "Everything fine?",
+"rw": "Ni byiza?"
+},
+{
+"c": "Alltagssprache",
+"de": "Ich komme gleich",
+"fr": "J'arrive tout de suite",
+"en": "I am coming right away",
+"rw": "Ndaje vuba"
+},
+{
+"c": "Alltagssprache",
+"de": "Ich gehe nach Hause",
+"fr": "Je rentre à la maison",
+"en": "I am going home",
+"rw": "Ndataha"
+}
+]

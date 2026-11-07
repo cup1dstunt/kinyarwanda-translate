@@ -33,9 +33,10 @@ function fill(select, values, label = (v) => v) {
   }));
 }
 
-const TABS = { translate: "translate", chat: "chat", phrases: "phrases", favs: "favs", currency: "currency" };
+const TABS = { translate: "translate", chat: "chat", phrases: "phrases", settings: "settings", currency: "currency" };
 
 function showLogin() {
+  stopPolling();
   $("login").hidden = false; $("tabbar").hidden = true;
   for (const v of Object.values(TABS)) $(v).hidden = true;
 }
@@ -47,10 +48,9 @@ function showTab(name) {
     $(view).hidden = tab !== name;
     $("tab-" + tab).classList.toggle("active", tab === name);
   }
-  if (name === "favs") renderFavs();
+  if (name === "settings") $("rate-count").textContent = loadJson("ratings").length;
   if (name === "phrases") loadPhrases();
-  if (name === "chat" && room && !$("chat-room").hidden) startPolling();
-  if (name !== "chat") stopPolling();
+  startPolling();
   setStatus("");
 }
 
@@ -72,17 +72,23 @@ async function init() {
     fill($("learn-tgt"), info.languages, (l) => LANG_LABELS[l]);
     $("learn-src").value = uiLang; $("learn-tgt").value = uiLang === "rw" ? "de" : "rw";
     myName = info.me ? info.me.name : "";
+    pushKey = info.push || null;
     myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
-    fill($("room-write"), info.languages, (l) => LANG_LABELS[l]);
     $("room-lang").value = store.get("room-lang") || uiLang;
-    resumeRoom();
+    fill($("room-write"), info.languages, (l) => LANG_LABELS[l]);
+    $("room-write").value = store.get("room-write") || $("room-lang").value;
+    if (store.get("chat-mode") === "room") setMode("room");
+    startPolling();
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
     fill($("conv-b"), info.languages, (l) => LANG_LABELS[l]);
     $("conv-a").value = uiLang; $("conv-b").value = uiLang === "rw" ? "de" : "rw";
     updateWho();
     showTab("translate");
     updateControls();
+    renderPush();
+    const fromNotice = new URLSearchParams(location.search).get("chat");
+    if (fromNotice) { history.replaceState(null, "", "/"); openChatFromNotice(fromNotice); }
   } catch (e) { setStatus(e.message); }
 }
 
@@ -95,7 +101,7 @@ $("password").onkeydown = (e) => { if (e.key === "Enter") $("login-btn").click()
 $("tab-translate").onclick = () => showTab("translate");
 $("tab-currency").onclick = () => showTab("currency");
 $("tab-chat").onclick = () => showTab("chat");
-$("tab-favs").onclick = () => showTab("favs");
+$("tab-settings").onclick = () => showTab("settings");
 $("tab-phrases").onclick = () => showTab("phrases");
 
 async function translate() {
@@ -129,12 +135,38 @@ $("clear").onclick = () => {
 
 // iOS: Mit offener Tastatur springt die Ansicht, wenn die fixierte Tab-Leiste und
 // automatisches Scrollen mitspielen. Tab-Leiste daher während der Eingabe ausblenden.
-const isField = (el) => el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName);
+// Nur Felder, für die eine Tastatur erscheint. Foto-Auswahl, Häkchen usw. zählen nicht: Bricht man die
+// iOS-Fotoauswahl ab, kommt kein focusout, und die Ansicht bliebe im Tipp-Modus hängen.
+const isField = (el) => !!el && (/^(TEXTAREA|SELECT)$/.test(el.tagName) ||
+  (el.tagName === "INPUT" && !/^(file|checkbox|radio|button|submit|range|color)$/.test(el.type)));
 const typing = () => isField(document.activeElement);
 document.addEventListener("focusin", (e) => { if (isField(e.target)) document.body.classList.add("typing"); });
 document.addEventListener("focusout", () => {
   setTimeout(() => { if (!typing()) document.body.classList.remove("typing"); }, 50);
 });
+
+// iOS verkleinert die Seite für die Tastatur nicht und schiebt die Ansicht beim Fokussieren oft zu weit.
+// Darum die sichtbare Fläche über der Tastatur messen (visualViewport), unten so viel Platz wie die Tastatur
+// hoch ist anhängen (--kb) und das aktive Feld selbst in den sichtbaren Bereich schieben.
+const vv = window.visualViewport;
+function keepFieldVisible() {
+  if (!vv) return;
+  const kb = Math.max(0, Math.round(document.documentElement.clientHeight - vv.height * vv.scale));
+  document.documentElement.style.setProperty("--kb", (kb > 80 ? kb : 0) + "px");
+  const el = document.activeElement;
+  if (kb <= 80 || !isField(el) || el.tagName === "SELECT") return;
+  const top = vv.offsetTop + 12, bottom = vv.offsetTop + vv.height - 12;
+  // möglichst die ganze Karte samt Knöpfen (z. B. „Senden“) zeigen, nicht nur das Textfeld
+  const box = el.closest(".chat-input, .pane");
+  const r = (box && box.getBoundingClientRect().height <= bottom - top ? box : el).getBoundingClientRect();
+  // Feld passt: ganz zeigen; Feld zu hoch: Anfang zeigen
+  const delta = r.height > bottom - top || r.top < top ? r.top - top : Math.max(0, r.bottom - bottom);
+  if (Math.abs(delta) > 4) window.scrollBy(0, delta);
+}
+let kbTimer = null;
+const scheduleKeep = () => { clearTimeout(kbTimer); kbTimer = setTimeout(keepFieldVisible, 150); };
+if (vv) vv.addEventListener("resize", scheduleKeep);
+document.addEventListener("focusin", scheduleKeep);
 
 // --- Sprachausgabe (nur de/fr) ---
 const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
@@ -236,12 +268,12 @@ if (synth) synth.onvoiceschanged = updateControls;
 // --- Texterkennung (Foto eines Schilds → Text → Übersetzung) ---
 const OCR_MAX_SIDE = 1600; // reicht für Schilder, hält Upload und Kosten klein
 
-function imageToBase64(file) {
+function imageToBase64(file, maxSide = OCR_MAX_SIDE) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const scale = Math.min(1, OCR_MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
@@ -364,7 +396,7 @@ $("zoom").onclick = () => { $("zoom").hidden = true; };
 $("show").onclick = () => zoom($("output").value);
 
 // --- Favoriten / Phrasebook (lokal, auch offline nutzbar) ---
-const CATEGORIES = ["Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
+const CATEGORIES = ["Alltagssprache", "Arzt", "Behörde", "Einkaufen", "Unterwegs", "Sonstiges"]; // gespeichert deutsch, angezeigt übersetzt
 
 function loadJson(key) {
   try { return JSON.parse(store.get(key) || "[]"); } catch { return []; }
@@ -390,39 +422,31 @@ $("fav").onclick = () => {
   setTimeout(() => $("fav").classList.remove("on"), 1500);
 };
 
-function renderFavs() {
-  const all = loadJson("favs");
-  const cats = [...new Set([...CATEGORIES, ...all.map((f) => f.cat)])];
-  const current = $("fav-filter").value || "";
-  fill($("fav-filter"), ["", ...cats], (c) => t(c || "Alle Kategorien"));
-  $("fav-filter").value = cats.includes(current) ? current : "";
-  const shown = all.filter((f) => !$("fav-filter").value || f.cat === $("fav-filter").value);
-  $("fav-empty").hidden = shown.length > 0;
-  $("fav-list").replaceChildren(...shown.map((f) => {
-    const card = document.createElement("div");
-    card.className = "card fav";
-    const meta = document.createElement("small");
-    meta.textContent = `${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
-    const inp = document.createElement("div");
-    inp.textContent = f.input;
-    const out = document.createElement("strong");
-    out.textContent = f.output;
-    const row = document.createElement("div");
-    row.className = "fav-actions";
-    row.append(
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
-      mkBtn("#i-trash", "Löschen", () => {
-        store.set("favs", JSON.stringify(loadJson("favs").filter((x) => favId(x) !== favId(f))));
-        renderFavs();
-      }),
-    );
-    card.append(meta, inp, out, row);
-    return card;
-  }));
-  $("rate-count").textContent = loadJson("ratings").length;
+function setFavs(list) { store.set("favs", JSON.stringify(list)); }
+
+// Karte für einen eigenen Favoriten (im Phrasen-Tab angezeigt)
+function favCard(f) {
+  const card = document.createElement("div");
+  card.className = "card fav";
+  const meta = document.createElement("small");
+  meta.textContent = `★ ${t(f.cat)} · ${LANG_LABELS[f.source]} → ${LANG_LABELS[f.target]}`;
+  const inp = document.createElement("div");
+  inp.textContent = f.input;
+  const out = document.createElement("strong");
+  out.textContent = f.output;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  row.append(
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(f.output)),
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(f.output, f.target, ""), !(serverTts || synth) || !SPEECH_TAGS[f.target]),
+    mkBtn("#i-trash", "Löschen", () => {
+      setFavs(loadJson("favs").filter((x) => favId(x) !== favId(f)));
+      renderPhrases();
+    }),
+  );
+  card.append(meta, inp, out, row);
+  return card;
 }
-$("fav-filter").onchange = renderFavs;
 
 // --- Zugänge (nur Admin) ---
 async function renderAdmin() {
@@ -508,71 +532,166 @@ $("rate-export").onclick = async () => {
   }
 };
 $("rate-clear").onclick = () => {
-  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); renderFavs(); }
+  if (window.confirm("Alle Bewertungen löschen?")) { store.del("ratings"); $("rate-count").textContent = "0"; }
 };
 
 // --- Phrasenbuch: fertige Sätze, Kinyarwanda ungeprüft bis zur Bestätigung ---
 let phrases = null;
+const fold = (x) => String(x || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const reviews = () => { try { return JSON.parse(store.get("phrase-review") || "{}"); } catch { return {}; } };
+
+const FAVS = "__favs", DIALOGS = "Gespräche";
+let myPhrases = [];
 
 async function loadPhrases() {
   if (!phrases) {
-    try { phrases = await (await fetch("/phrases.json")).json(); } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
-    const cats = [...new Set(phrases.map((p) => p.c))];
-    fill($("ph-cat"), cats, (c) => t(c));
+    try {
+      const [base, more] = await Promise.all([fetch("/phrases.json"), fetch("/dictionary.json")]);
+      phrases = [...await base.json(), ...await more.json()];
+    } catch { setStatus("Phrasenbuch konnte nicht geladen werden."); return; }
     const targets = UI_LANGS.filter((l) => l !== uiLang);
     fill($("ph-lang"), targets, (l) => "→ " + LANG_LABELS[l]);
     $("ph-lang").value = targets.includes("rw") ? "rw" : targets[0];
   }
+  try { myPhrases = (await api("/api/my-phrases")).phrases.map((p) => ({ ...p, own: true })); } catch { myPhrases = []; }
+  // Kategorien jedes Mal neu, weil eigene Phrasen und Favoriten neue Kategorien mitbringen können
+  const cats = [...new Set([...phrases.map((p) => p.c), ...myPhrases.map((p) => p.c), ...loadJson("favs").map((f) => f.cat)])];
+  const current = $("ph-cat").value || store.get("ph-cat") || (loadJson("favs").length ? FAVS : DIALOGS);
+  fill($("ph-cat"), [FAVS, ...cats], (c) => (c === FAVS ? "★ " + t("Favoriten") : t(c)));
+  $("ph-cat").value = [FAVS, ...cats].includes(current) ? current : DIALOGS;
+  fill($("ph-add-cat"), [...new Set([...cats.filter((c) => c !== DIALOGS), "Eigene"])], (c) => t(c));
   renderPhrases();
+}
+
+// Ein fertiger Satz als Karte oder (im Gespräch) als Sprechblase
+function phraseCard(p, lang, className, showCat) {
+  const key = p.de + "|" + lang;
+  const r = reviews()[key];
+  const text = r && r.text ? r.text : p[lang];
+  const verified = lang === "rw" && (p.v || r);
+  const card = document.createElement("div");
+  card.className = className;
+  const meta = document.createElement("small");
+  meta.textContent = [showCat ? t(p.c) : "", lang === "rw" && !p.own ? t(verified ? "✓ geprüft" : "ungeprüft") : ""].filter(Boolean).join(" · ");
+  const src = document.createElement("div");
+  src.textContent = p[uiLang];
+  const out = document.createElement("strong");
+  out.textContent = text;
+  const row = document.createElement("div");
+  row.className = "fav-actions";
+  const review = (good, correction) => {
+    addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
+    const all = reviews();
+    all[key] = { text: correction || p[lang] };
+    store.set("phrase-review", JSON.stringify(all));
+    renderPhrases();
+  };
+  const fav = { cat: p.c, source: uiLang, target: lang, input: p[uiLang], output: text };
+  const isFav = loadJson("favs").some((f) => favId(f) === favId(fav));
+  const star = mkBtn("#i-star", isFav ? "Aus Favoriten entfernen" : "Als Favorit speichern", () => {
+    const rest = loadJson("favs").filter((f) => favId(f) !== favId(fav));
+    setFavs(isFav ? rest : [fav, ...rest]);
+    renderPhrases();
+  });
+  star.classList.toggle("on", isFav);
+  row.append(
+    mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
+    mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
+    star,
+  );
+  if (p.own) {
+    row.append(mkBtn("#i-trash", "Phrase löschen", async () => {
+      if (!window.confirm(t("Phrase „{0}“ löschen?", p[uiLang]))) return;
+      try {
+        const res = await fetch("/api/my-phrases/" + p.id, { method: "DELETE", headers: { "X-App-Password": password } });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+      } catch (e) { setStatus(e.message); }
+      loadPhrases();
+    }));
+  } else if (lang === "rw" && !verified) {
+    // Bewertung nur für noch ungeprüfte Sätze, klein hinter einem Knopf
+    const pair = document.createElement("span");
+    pair.hidden = true;
+    const up = document.createElement("button");
+    up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
+    up.onclick = () => review(true, "");
+    const down = document.createElement("button");
+    down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
+    down.onclick = () => {
+      const fix = window.prompt(t("Richtige Übersetzung:"), text);
+      if (fix !== null && fix.trim()) review(false, fix.trim());
+    };
+    pair.append(up, down);
+    const more = document.createElement("button");
+    more.className = "icon"; more.textContent = "⋯"; more.title = t("Prüfen"); more.setAttribute("aria-label", t("Prüfen"));
+    more.onclick = () => { pair.hidden = !pair.hidden; };
+    row.append(more, pair);
+  }
+  card.append(...(meta.textContent ? [meta] : []), src, out, row);
+  return card;
+}
+
+// Kurzes Gespräch: Zeilen mit gleichem Titel ("d"), abwechselnd links (a) und rechts (b)
+function dialogCard(title, lines, lang) {
+  const box = document.createElement("div");
+  box.className = "dialog";
+  const head = document.createElement("h3");
+  head.textContent = t(title);
+  const log = document.createElement("div");
+  log.className = "chat-log";
+  log.append(...lines.map((p) => phraseCard(p, lang, "bubble fav " + (p.s === "b" ? "b" : "a"))));
+  box.append(head, log);
+  return box;
 }
 
 function renderPhrases() {
   if (!phrases) return;
-  const lang = $("ph-lang").value, rev = reviews();
+  const cat = $("ph-cat").value, lang = $("ph-lang").value, favs = loadJson("favs");
+  const q = fold($("ph-search").value);
+  store.set("ph-cat", cat);
+  $("ph-cat").hidden = !!q;
+  $("ph-lang").hidden = cat === FAVS && !q;
+  $("ph-hint").hidden = cat === FAVS && !q;
+  $("fav-empty").hidden = !(cat === FAVS && !q && !favs.length);
   $("ph-hint").textContent = t("Fertige Sätze, {0} → Zielsprache. Kinyarwanda ist ungeprüft, bis es mit 👍 bestätigt oder mit 👎 korrigiert wurde.", LANG_LABELS[uiLang]);
-  $("ph-list").replaceChildren(...phrases.filter((p) => p.c === $("ph-cat").value).map((p) => {
-    const key = p.de + "|" + lang;
-    const r = rev[key];
-    const text = r && r.text ? r.text : p[lang];
-    const card = document.createElement("div");
-    card.className = "card fav";
-    const meta = document.createElement("small");
-    meta.textContent = lang === "rw" ? t(r ? "✓ geprüft" : "ungeprüft") : "";
-    const de = document.createElement("div");
-    de.textContent = p[uiLang];
-    const out = document.createElement("strong");
-    out.textContent = text;
-    const row = document.createElement("div");
-    row.className = "fav-actions";
-    const review = (good, correction) => {
-      addRating({ provider: "phrasebook", source: uiLang, target: lang, input: p[uiLang], output: p[lang], good, correction });
-      const all = reviews();
-      all[key] = { text: correction || p[lang] };
-      store.set("phrase-review", JSON.stringify(all));
-      renderPhrases();
-    };
-    row.append(
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(text)),
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
-    );
-    if (lang === "rw") {
-      const up = document.createElement("button");
-      up.className = "icon"; up.textContent = "👍"; up.title = t("Stimmt");
-      up.onclick = () => review(true, "");
-      const down = document.createElement("button");
-      down.className = "icon"; down.textContent = "👎"; down.title = t("Korrigieren");
-      down.onclick = () => {
-        const fix = window.prompt(t("Richtige Übersetzung:"), text);
-        if (fix !== null && fix.trim()) review(false, fix.trim());
-      };
-      row.append(up, down);
-    }
-    card.append(...(meta.textContent ? [meta] : []), de, out, row);
-    return card;
-  }));
+  const all = [...phrases, ...myPhrases];
+  if (q) {
+    // Suche: alle Kategorien und alle Sprachen, höchstens 80 Treffer
+    const hits = all.filter((p) => UI_LANGS.some((l) => fold(p[l]).includes(q))).slice(0, 80);
+    $("ph-list").replaceChildren(...hits.map((p) => phraseCard(p, lang, "card fav", true)));
+    return;
+  }
+  if (cat === FAVS) { $("ph-list").replaceChildren(...favs.map(favCard)); return; }
+  const list = all.filter((p) => p.c === cat);
+  // eigene Favoriten dieser Kategorie oben, außer sie stammen selbst aus dem Phrasenbuch (die haben dort den Stern)
+  const own = favs.filter((f) => f.cat === cat && !list.some((p) => p[f.source] === f.input));
+  let cards;
+  if (cat === DIALOGS) {
+    const groups = new Map();
+    for (const p of list) groups.set(p.d, [...(groups.get(p.d) || []), p]);
+    cards = [...groups].map(([title, lines]) => dialogCard(title, lines, lang));
+  } else {
+    cards = list.map((p) => phraseCard(p, lang, "card fav"));
+  }
+  $("ph-list").replaceChildren(...own.map(favCard), ...cards);
 }
+$("ph-add").onclick = async () => {
+  const text = $("ph-add-text").value.trim();
+  if (!text) return;
+  $("ph-add").disabled = true;
+  setStatus("Übersetze …");
+  try {
+    await api("/api/my-phrases", { text, lang: uiLang, category: $("ph-add-cat").value });
+    $("ph-add-text").value = "";
+    $("ph-add-box").open = false;
+    setStatus("");
+    await loadPhrases();
+    $("ph-cat").value = $("ph-add-cat").value; renderPhrases();
+  } catch (e) { setStatus(e.message); }
+  $("ph-add").disabled = false;
+};
 $("ph-cat").onchange = $("ph-lang").onchange = renderPhrases;
+$("ph-search").oninput = renderPhrases;
 
 // --- Gesprächsmodus: zwei Sprachen, abwechselnd ---
 let who = "a";
@@ -642,49 +761,162 @@ function setLearnMode(mode) {
 $("ph-mode-phrases").onclick = () => setLearnMode("phrases");
 $("ph-mode-learn").onclick = () => setLearnMode("learn");
 
+let learnData = { lists: [], categories: [] };
+let people = [];
+
+function peoplePicker(box, preselected = []) {
+  box.replaceChildren(...(people.length ? people.map((n) => {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = n; cb.checked = preselected.includes(n);
+    label.append(cb, document.createTextNode(n));
+    return label;
+  }) : [Object.assign(document.createElement("small"), { textContent: t("Noch keine anderen Personen angelegt.") })]));
+}
+const pickedPeople = (box) => [...box.querySelectorAll("input:checked")].map((c) => c.value);
+let learnOwn = "all"; // all | mine | others
+
+for (const [key, id] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) {
+  $(id).onclick = () => {
+    learnOwn = key;
+    for (const [k, i] of [["all", "learn-own-all"], ["mine", "learn-own-mine"], ["others", "learn-own-others"]]) $(i).classList.toggle("active", k === key);
+    renderLists();
+  };
+}
+$("learn-cat-filter").onchange = renderLists;
+
+function addWordsForm(l) {
+  const box = document.createElement("div");
+  box.className = "learn-form";
+  box.hidden = true;
+  const ta = document.createElement("textarea");
+  ta.placeholder = t("Eine Zeile pro Wort, z. B. Wasser = amazi");
+  const ok = document.createElement("button");
+  ok.className = "primary"; ok.textContent = t("Hinzufügen");
+  ok.onclick = async () => {
+    const items = parseWordLines(ta.value);
+    if (!items.length) { setStatus("Bereits vorhanden oder leer."); return; }
+    ok.disabled = true;
+    setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
+    try {
+      await api(`/api/lists/${l.id}/items`, { items });
+      setStatus("");
+      loadLists();
+    } catch (e) { setStatus(e.message); }
+    ok.disabled = false;
+  };
+  box.append(ta, ok);
+  return box;
+}
+
+function renderLists() {
+  const cat = $("learn-cat-filter").value;
+  const shown = learnData.lists.filter((l) => (learnOwn === "all" || (learnOwn === "mine") === (l.owner === myName))
+    && (!cat || (l.category || "Sonstiges") === cat));
+  $("learn-empty").textContent = t(learnData.lists.length ? "Keine Listen in dieser Auswahl." : "Noch keine Listen. Lege unten die erste an.");
+  $("learn-empty").hidden = shown.length > 0;
+  $("learn-lists").replaceChildren(...shown.map((l) => {
+    const card = document.createElement("div");
+    card.className = "card fav";
+    const meta = document.createElement("small");
+    const mine = l.owner === myName;
+    meta.textContent = `${mine ? (l.to && l.to.length ? t("An: {0}", l.to.join(", ")) : t("Meine")) : t("Von {0}", l.owner)} · ${t(l.category || "Sonstiges")} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
+    const title = document.createElement("strong");
+    title.textContent = l.title;
+    const row = document.createElement("div");
+    row.className = "fav-actions learn-actions";
+    const start = document.createElement("button");
+    start.className = "primary"; start.textContent = t("Test starten");
+    start.onclick = () => startQuiz(l);
+    row.append(mkBtn("#i-book", "Lernen mit Karten", () => startCards(l)), start);
+    card.append(meta, title, row);
+    if (!mine && l.to && l.to.includes(myName)) {
+      row.append(mkBtn("#i-trash", "Liste aus meiner Ansicht entfernen", async () => {
+        if (!window.confirm(t("Liste „{0}“ entfernen?", l.title))) return;
+        try { await api(`/api/lists/${l.id}/leave`, {}); } catch (e) { setStatus(e.message); }
+        loadLists();
+      }));
+    }
+    if (myAdmin || mine) {
+      const sendBox = document.createElement("div");
+      sendBox.className = "learn-form"; sendBox.hidden = true;
+      const picker = document.createElement("fieldset");
+      picker.className = "people";
+      const pk = document.createElement("div");
+      picker.append(Object.assign(document.createElement("legend"), { textContent: t("Senden an") }), pk);
+      const go = document.createElement("button");
+      go.className = "primary"; go.textContent = t("Senden");
+      go.onclick = async () => {
+        const names = pickedPeople(pk);
+        if (!names.length) return;
+        go.disabled = true;
+        try {
+          await api(`/api/lists/${l.id}/share`, { to: names });
+          setStatus(t("Gesendet an {0}.", names.join(", ")));
+          loadLists();
+        } catch (e) { setStatus(e.message); }
+        go.disabled = false;
+      };
+      sendBox.append(picker, go);
+      row.append(mkBtn("#i-chat", "Liste senden", () => { peoplePicker(pk, l.to || []); sendBox.hidden = !sendBox.hidden; }));
+      card.append(sendBox);
+    }
+    if (myAdmin || mine) {
+      const form = addWordsForm(l);
+      row.append(mkBtn("#i-plus", "Wörter hinzufügen", () => { form.hidden = !form.hidden; }));
+      row.append(mkBtn("#i-book", "In meine Phrasen übernehmen", async () => {
+        setStatus("Übersetze …");
+        try {
+          const r = await api("/api/my-phrases/from-list", { list_id: l.id });
+          setStatus(t("{0} Phrasen übernommen.", r.added));
+        } catch (e) { setStatus(e.message); }
+      }));
+      row.append(mkBtn("#i-trash", "Liste löschen", async () => {
+        if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
+        try {
+          const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+        } catch (e) { setStatus(e.message); }
+        loadLists();
+      }));
+      card.append(form);
+    }
+    return card;
+  }));
+}
+
 async function loadLists() {
   try {
-    const r = await api("/api/lists");
-    $("learn-empty").hidden = r.lists.length > 0;
-    $("learn-lists").replaceChildren(...r.lists.map((l) => {
-      const card = document.createElement("div");
-      card.className = "card fav";
-      const meta = document.createElement("small");
-      meta.textContent = `${l.owner} · ${LANG_LABELS[l.source]} → ${LANG_LABELS[l.target]} · ${t("{0} Wörter", l.items.length)}`;
-      const title = document.createElement("strong");
-      title.textContent = l.title;
-      const row = document.createElement("div");
-      row.className = "fav-actions learn-actions";
-      const start = document.createElement("button");
-      start.className = "primary"; start.textContent = t("Üben");
-      start.onclick = () => startQuiz(l);
-      row.append(start);
-      if (myAdmin || l.owner === myName) {
-        row.append(mkBtn("#i-trash", "Liste löschen", async () => {
-          if (!window.confirm(t("Liste „{0}“ löschen?", l.title))) return;
-          try {
-            const res = await fetch("/api/lists/" + l.id, { method: "DELETE", headers: { "X-App-Password": password } });
-            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
-          } catch (e) { setStatus(e.message); }
-          loadLists();
-        }));
-      }
-      card.append(meta, title, row);
-      return card;
-    }));
+    learnData = await api("/api/lists");
+    try { people = (await api("/api/people")).people; } catch { people = []; }
+    peoplePicker($("learn-to"), pickedPeople($("learn-to")));
+    const fill2 = (sel, first) => {
+      const keep = sel.value;
+      sel.replaceChildren(...[...(first ? [["", t("Alle Kategorien")]] : []), ...learnData.categories.map((c) => [c, t(c)])].map(([v, label]) => {
+        const o = document.createElement("option"); o.value = v; o.textContent = label; return o;
+      }));
+      if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+    };
+    fill2($("learn-cat-filter"), true);
+    fill2($("learn-cat"), false);
+    renderLists();
   } catch (e) { setStatus(e.message); }
 }
 
-$("learn-save").onclick = async () => {
-  const items = $("learn-items").value.split("\n").map((line) => {
+function parseWordLines(text) {
+  return text.split("\n").map((line) => {
     const [a, ...rest] = line.split("=");
     return { a: a.trim(), b: rest.join("=").trim() };
   }).filter((i) => i.a);
+}
+
+$("learn-save").onclick = async () => {
+  const items = parseWordLines($("learn-items").value);
   if (!$("learn-title").value.trim() || !items.length) { setStatus("Titel und mindestens ein Wort nötig."); return; }
   $("learn-save").disabled = true;
   setStatus(items.some((i) => !i.b) ? "Übersetze fehlende Wörter …" : "Speichere …");
   try {
-    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, items });
+    await api("/api/lists", { title: $("learn-title").value, source: $("learn-src").value, target: $("learn-tgt").value, category: $("learn-cat").value, to: pickedPeople($("learn-to")), items });
     $("learn-title").value = ""; $("learn-items").value = "";
     $("learn-new").open = false;
     setStatus("");
@@ -694,6 +926,40 @@ $("learn-save").onclick = async () => {
 };
 
 const norm = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+// --- Lernkarten: Wort anzeigen, umdrehen, „gewusst“ oder „nochmal“ ---
+let deck = null;
+
+function startCards(list) {
+  deck = { list, queue: shuffle(list.items.map((it) => ({ front: it.a, back: it.b }))), total: list.items.length, known: 0, flipped: false };
+  $("learn-home").hidden = true;
+  $("cards").hidden = false;
+  showCard();
+}
+
+function showCard() {
+  if (!deck.queue.length) {
+    $("cards-progress").textContent = t("Fertig");
+    $("cards-face").textContent = t("Alle Karten gelernt, super!");
+    $("cards-face").disabled = true; $("cards-hint").hidden = true; $("cards-answers").hidden = true;
+    return;
+  }
+  const c = deck.queue[0];
+  deck.flipped = false;
+  $("cards-progress").textContent = `${deck.known} / ${deck.total}`;
+  $("cards-face").textContent = c.front;
+  $("cards-face").disabled = false; $("cards-hint").hidden = false; $("cards-answers").hidden = true;
+}
+
+$("cards-face").onclick = () => {
+  const c = deck.queue[0];
+  deck.flipped = !deck.flipped;
+  $("cards-face").textContent = deck.flipped ? c.back : c.front;
+  $("cards-hint").hidden = deck.flipped; $("cards-answers").hidden = !deck.flipped;
+};
+$("cards-known").onclick = () => { deck.queue.shift(); deck.known++; showCard(); };
+$("cards-again").onclick = () => { deck.queue.push(deck.queue.shift()); showCard(); };
+$("cards-stop").onclick = () => { $("cards").hidden = true; $("learn-home").hidden = false; };
+
 let quiz = null;
 
 function shuffle(a) {
@@ -768,169 +1034,420 @@ $("quiz-next").onclick = () => {
 const nextHandler = $("quiz-next").onclick;
 $("quiz-stop").onclick = () => { quiz = null; $("quiz").hidden = true; $("learn-home").hidden = false; $("quiz-next").onclick = nextHandler; };
 
-// --- Gespräch über zwei Handys (Raum-Code, Abfrage alle 2 s) ---
-const cid = store.get("cid") || (() => { const v = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, ""); store.set("cid", v); return v; })();
-let room = null, lastId = 0, pollTimer = null;
+// --- Chats zwischen Personen: dauerhaft auf dem Server, Abfrage per Polling ---
+let room = null, lastId = 0, pollTimer = null; // room = geöffneter Chat (Zusammenfassung vom Server)
+let chatGen = 0, polling = false, pollAgain = false; // nie zwei Abfragen gleichzeitig (sonst doppelte Nachrichten)
+const CHAT_IMAGE_SIDE = 1280; // Fotos vor dem Senden verkleinern (ca. 200-400 kB)
+const imageUrls = new Map(); // Datei -> Blob-URL; Bilder brauchen den Passwort-Header, darum kein <img src> direkt
 
 function setMode(mode) {
   $("chat-local").hidden = mode !== "local";
   $("chat-room").hidden = mode !== "room";
   $("mode-local").classList.toggle("active", mode === "local");
   $("mode-room").classList.toggle("active", mode === "room");
-  if (mode === "room" && room) startPolling(); else stopPolling();
+  store.set("chat-mode", mode);
+  startPolling();
 }
 $("mode-local").onclick = () => setMode("local");
 $("mode-room").onclick = () => setMode("room");
 
+// Offener Chat: alle 2 s neue Nachrichten; Chatliste: alle 10 s; sonst nur ab und zu für das Abzeichen
 function stopPolling() { clearInterval(pollTimer); pollTimer = null; }
-function startPolling() { stopPolling(); if ($("chat").hidden) return; poll(); pollTimer = setInterval(poll, 2000); }
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) stopPolling(); else if (room && !$("chat-room").hidden) startPolling();
-});
+function startPolling() {
+  stopPolling();
+  if (document.hidden || !password) return;
+  const inChats = !$("chat").hidden && !$("chat-room").hidden;
+  const tick = inChats && room ? poll : loadChats;
+  tick();
+  pollTimer = setInterval(tick, inChats ? (room ? 2000 : 10000) : 60000);
+}
+document.addEventListener("visibilitychange", startPolling);
+
+const chatLang = () => $("room-lang").value;
+const chatName = (c) => c.title || c.members.filter((m) => m.name !== myName).map((m) => m.name).join(", ");
+const clock = (sec) => new Date(sec * 1000).toLocaleString(uiLang, { hour: "2-digit", minute: "2-digit", day: "numeric", month: "numeric" });
 
 function showRoom() {
-  $("room-join").hidden = !!room;
+  $("chats-home").hidden = !!room;
   $("room-live").hidden = !room;
-  if (room) $("room-title").textContent = room;
-}
-
-async function enterRoom(code) {
-  const lang = $("room-lang").value;
-  store.set("room-lang", lang);
-  try {
-    const r = await api("/api/rooms", { cid, lang, code: code || null });
-    room = r.room; lastId = 0;
-    store.set("room", JSON.stringify({ room, lang }));
-    $("room-log").replaceChildren(); bubbles.clear();
-    $("room-write").value = lang;
-    showRoom(); startPolling(); setStatus("");
-  } catch (e) { setStatus(e.message); }
-}
-$("room-create").onclick = () => enterRoom("");
-$("room-enter").onclick = () => { const c = $("room-code").value.trim(); if (c) enterRoom(c); };
-
-function resumeRoom() {
-  let saved = null;
-  try { saved = JSON.parse(store.get("room") || "null"); } catch { /* ignorieren */ }
-  if (!saved || room) return;
-  $("room-lang").value = saved.lang;
-  api("/api/rooms", { cid, lang: saved.lang, code: saved.room }).then((r) => {
-    room = r.room; lastId = 0; $("room-write").value = saved.lang; showRoom(); setMode("room");
-  }).catch(() => store.del("room"));
-}
-
-async function poll() {
   if (!room) return;
-  try {
-    const r = await api(`/api/rooms/${room}/messages?cid=${cid}&after=${lastId}`);
-    $("room-members").textContent = r.members.map((m) => `${m.name} (${LANG_LABELS[m.lang]})`).join(", ");
-    for (const m of r.messages) { addRoomBubble(m); lastId = Math.max(lastId, m.id); }
-    updateReactions(r.reactions || {});
-  } catch (e) {
-    setStatus(e.message);
-    if (/Raum|nicht/.test(e.message)) leaveRoom(false);
-    else { stopPolling(); setTimeout(() => { if (room) startPolling(); }, 10000); } // bei Fehlern nicht im 2-s-Takt wiederholen
+  $("room-title").textContent = chatName(room);
+  $("room-members").textContent = room.members.map((m) => m.name + (m.lang ? ` (${LANG_LABELS[m.lang]})` : "")).join(", ");
+}
+
+async function loadChats() {
+  let list;
+  try { list = (await api("/api/chats")).chats; } catch { return; }
+  const unread = list.reduce((n, c) => n + c.unread, 0);
+  $("chat-badge").hidden = !unread;
+  $("chat-badge").textContent = unread > 9 ? "9+" : String(unread);
+  // Zahl am App-Symbol (iOS nur mit erlaubten Mitteilungen, Android zeigt stattdessen einen Punkt)
+  try { if (navigator.setAppBadge) await (unread ? navigator.setAppBadge(unread) : navigator.clearAppBadge()); } catch { /* nicht erlaubt */ }
+  $("chats-empty").hidden = list.length > 0;
+  $("chats-list").replaceChildren(...list.map((c) => {
+    const card = document.createElement("button");
+    card.className = "card fav chat-item";
+    const head = document.createElement("div");
+    head.className = "chat-item-head";
+    const name = document.createElement("strong");
+    name.textContent = chatName(c);
+    head.append(name);
+    if (c.unread) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = c.unread;
+      head.append(badge);
+    }
+    const last = document.createElement("small");
+    last.textContent = c.last ? `${c.last.name === myName ? t("Du") : c.last.name}: ${c.last.image && !c.last.text ? "📷 " + t("Foto") : c.last.text} · ${clock(c.last.time)}` : t("Noch keine Nachrichten");
+    card.append(head, last);
+    card.onclick = () => openChat(c);
+    return card;
+  }));
+  const wanted = store.get("chat-open");
+  if (wanted && !room && !$("chat-room").hidden) {
+    const found = list.find((c) => c.id === wanted);
+    if (found) openChat(found); else store.del("chat-open");
   }
 }
 
-const bubbles = new Map(); // Nachrichten-ID -> {chips, reactions}
+function openChat(c) {
+  room = c; lastId = 0; chatGen++;
+  clearPhoto();
+  closeNotifications(c.id);
+  store.set("chat-open", c.id);
+  $("room-log").replaceChildren();
+  showRoom(); startPolling(); setStatus("");
+}
+
+function closeChat() {
+  room = null; store.del("chat-open");
+  showRoom(); startPolling();
+}
+$("room-back").onclick = closeChat;
+
+$("room-write").onchange = () => store.set("room-write", $("room-write").value);
+$("room-lang").onchange = () => {
+  store.set("room-lang", chatLang());
+  $("room-write").value = chatLang(); store.set("room-write", chatLang()); // Schreibsprache folgt der Leseprache, bleibt aber änderbar
+  if (room) openChat(room); // alles neu in der gewählten Sprache laden
+};
+
+$("chat-new").addEventListener("toggle", async () => {
+  if (!$("chat-new").open) return;
+  try { people = (await api("/api/people")).people; } catch { people = []; }
+  peoplePicker($("chat-people"), pickedPeople($("chat-people")));
+});
+$("chat-create").onclick = async () => {
+  const members = pickedPeople($("chat-people"));
+  if (!members.length) { setStatus("Bitte mindestens eine Person auswählen"); return; }
+  try {
+    const c = await api("/api/chats", { title: $("chat-title").value.trim(), members });
+    $("chat-title").value = ""; $("chat-new").open = false;
+    peoplePicker($("chat-people"));
+    openChat(c);
+  } catch (e) { setStatus(e.message); }
+};
+
+async function poll() {
+  if (!room) return;
+  // iOS löst beim Senden, beim Foto-Auswählen und beim Zurückkehren in die App zusätzliche Abfragen aus.
+  // Läuft schon eine, nur vormerken; danach genau eine weitere.
+  if (polling) { pollAgain = true; return; }
+  polling = true;
+  const id = room.id, gen = chatGen;
+  try {
+    const r = await api(`/api/chats/${id}/messages?lang=${chatLang()}&after=${lastId}`);
+    if (gen !== chatGen || !room) return; // inzwischen anderer Chat geöffnet oder Sprache gewechselt
+    room = r.chat; showRoom();
+    for (const m of r.messages) {
+      if (!roomBubble(m.id)) addRoomBubble(m);
+      lastId = Math.max(lastId, m.id);
+    }
+    updateReactions(r.reactions || {});
+    for (const gone of r.deleted || []) { const el = roomBubble(gone); if (el) el.remove(); }
+    if (r.messages.length) loadChats(); // gelesen: Abzeichen und Liste aktualisieren
+  } catch (e) {
+    setStatus(e.message);
+    if (/Chat nicht gefunden/.test(e.message)) closeChat();
+    else { stopPolling(); setTimeout(() => { if (room) startPolling(); }, 10000); } // bei Fehlern nicht im 2-s-Takt wiederholen
+  } finally {
+    polling = false;
+    if (pollAgain) { pollAgain = false; poll(); }
+  }
+}
+
+const roomBubble = (msgId) => $("room-log").querySelector(`[data-id="${msgId}"]`);
+
+async function chatImage(file) {
+  if (!imageUrls.has(file)) {
+    const res = await fetch(`/api/chats/${room.id}/images/${file}`, { headers: { "X-App-Password": password } });
+    if (!res.ok) throw new Error(t("Fehler {0}", res.status));
+    imageUrls.set(file, URL.createObjectURL(await res.blob()));
+  }
+  return imageUrls.get(file);
+}
 
 function addRoomBubble(m) {
   const div = document.createElement("div");
   div.className = "bubble " + (m.mine ? "b" : "a");
+  div.dataset.id = m.id;
   const who = document.createElement("small");
-  who.textContent = m.mine ? t("Du") : m.name;
-  const big = document.createElement("div");
-  big.className = "big-text";
-  big.textContent = m.text;
-  div.append(who, big);
-  const orig = document.createElement("small");
-  orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
-  orig.hidden = m.original === m.text;
-  div.append(orig);
-  let shownLang = $("room-lang").value;
+  who.textContent = `${m.mine ? t("Du") : m.name} · ${clock(m.time)}`;
+  div.append(who);
+  if (m.image) {
+    const img = document.createElement("img");
+    img.className = "chat-img"; img.alt = t("Foto");
+    chatImage(m.image).then((url) => {
+      img.src = url;
+      img.onclick = () => { $("img-zoom-pic").src = url; $("img-zoom").hidden = false; };
+    }).catch(() => { img.alt = t("Foto konnte nicht geladen werden"); });
+    div.append(img);
+  }
   const row = document.createElement("div");
   row.className = "fav-actions";
-  const speak = mkBtn("#i-speaker", "Vorlesen", () => speakAny(big.textContent, shownLang, ""), !(serverTts || synth) || !SPEECH_TAGS[shownLang]);
-  // Zielsprache nur für diese eine Nachricht; übersetzt wird immer das Original, nie eine Übersetzung.
-  const pick = document.createElement("select");
-  pick.className = "mini";
-  pick.setAttribute("aria-label", t("Sprache dieser Nachricht"));
-  const first = document.createElement("option");
-  first.value = ""; first.textContent = "🌐 " + t("Sprache");
-  pick.append(first);
-  for (const l of Object.keys(LANG_LABELS)) {
-    const o = document.createElement("option");
-    o.value = l; o.textContent = LANG_LABELS[l];
-    pick.append(o);
+  if (m.text) {
+    const big = document.createElement("div");
+    big.className = "big-text";
+    big.textContent = m.text;
+    div.append(big);
+    if (!m.mine && m.original !== m.text) {
+      const orig = document.createElement("small");
+      orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
+      div.append(orig);
+    }
+    let shownLang = m.mine ? m.lang : chatLang();
+    const speak = mkBtn("#i-speaker", "Vorlesen", () => speakAny(big.textContent, shownLang, ""), !(serverTts || synth) || !SPEECH_TAGS[shownLang]);
+    row.append(speak, mkBtn("#i-expand", "Groß anzeigen", () => zoom(big.textContent)));
+    // Zielsprache nur für diese Nachricht; übersetzt wird immer das Original, nie eine Übersetzung
+    const pick = document.createElement("select");
+    pick.className = "mini";
+    pick.setAttribute("aria-label", t("Sprache dieser Nachricht"));
+    pick.append(new Option("🌐 " + t("Sprache"), ""));
+    for (const l of Object.keys(LANG_LABELS)) pick.append(new Option(LANG_LABELS[l], l));
+    pick.onchange = async () => {
+      const target = pick.value || (m.mine ? m.lang : chatLang());
+      try {
+        const standard = !pick.value || target === (m.mine ? m.lang : chatLang());
+        const r = standard ? { text: m.text } : await api(`/api/chats/${room.id}/messages/${m.id}/translation?target=${target}`);
+        big.textContent = r.text; shownLang = target;
+        speak.disabled = !(serverTts || synth) || !SPEECH_TAGS[target];
+        setStatus("");
+      } catch (e) { setStatus(e.message); }
+    };
+    row.append(pick);
   }
-  pick.onchange = async () => {
-    const target = pick.value || $("room-lang").value;
-    try {
-      const r = pick.value ? await api(`/api/rooms/${room}/messages/${m.id}/translation?cid=${cid}&target=${target}`) : { text: m.text };
-      big.textContent = r.text; shownLang = target;
-      orig.hidden = target === m.lang;
-      speak.disabled = !(serverTts || synth) || !SPEECH_TAGS[target];
-      setStatus("");
-    } catch (e) { setStatus(e.message); }
-  };
-  const chips = document.createElement("div");
-  chips.className = "chips";
   const picker = document.createElement("div");
   picker.className = "chips"; picker.hidden = true;
   for (const e of REACTIONS) {
     const b = document.createElement("button");
     b.className = "chip"; b.textContent = e;
-    b.onclick = async () => {
-      picker.hidden = true;
-      try { await api(`/api/rooms/${room}/messages/${m.id}/reactions`, { cid, emoji: e }); await poll(); } catch (err) { setStatus(err.message); }
-    };
+    b.onclick = () => { picker.hidden = true; toggleReaction(m.id, e); };
     picker.append(b);
   }
   const react = document.createElement("button");
   react.className = "icon"; react.textContent = "☺"; react.title = t("Reagieren"); react.setAttribute("aria-label", t("Reagieren"));
   react.onclick = () => { picker.hidden = !picker.hidden; };
-  row.append(speak, mkBtn("#i-expand", "Groß anzeigen", () => zoom(big.textContent)), pick, react);
+  row.append(react);
+  if (m.image) row.append(mkBtn("#i-download", "Foto speichern", () => saveChatImage(m.image)));
+  if (m.mine) row.append(mkBtn("#i-trash", "Nachricht löschen", () => deleteChatMessage(m.id)));
+  const chips = document.createElement("div");
+  chips.className = "chips"; chips.dataset.chips = m.id;
   div.append(row, picker, chips);
-  bubbles.set(m.id, { chips });
   $("room-log").append(div);
   if (!typing()) div.scrollIntoView({ block: "nearest" });
 }
 
 const REACTIONS = ["👍", "❤️", "😂", "😮", "🙏"];
 
+async function toggleReaction(msgId, emoji) {
+  try { await api(`/api/chats/${room.id}/messages/${msgId}/reactions`, { emoji }); await poll(); } catch (e) { setStatus(e.message); }
+}
+
 function updateReactions(all) {
-  for (const [id, b] of bubbles) {
-    b.chips.replaceChildren();
-    for (const r of all[id] || []) {
+  for (const box of $("room-log").querySelectorAll("[data-chips]")) {
+    box.replaceChildren(...(all[box.dataset.chips] || []).map((r) => {
       const c = document.createElement("button");
       c.className = "chip" + (r.mine ? " mine" : "");
       c.textContent = r.count > 1 ? `${r.emoji} ${r.count}` : r.emoji;
-      c.onclick = async () => {
-        try { await api(`/api/rooms/${room}/messages/${id}/reactions`, { cid, emoji: r.emoji }); await poll(); } catch (err) { setStatus(err.message); }
-      };
-      b.chips.append(c);
-    }
+      c.onclick = () => toggleReaction(Number(box.dataset.chips), r.emoji);
+      return c;
+    }));
   }
 }
 
-$("room-send").onclick = async () => {
-  const text = $("room-text").value.trim();
-  if (!text || !room) return;
-  $("room-send").disabled = true;
+// Foto aufs Handy: auf dem iPhone über das Teilen-Menü („Bild sichern“), sonst als Download
+async function saveChatImage(file) {
   try {
-    await api(`/api/rooms/${room}/messages`, { cid, text, lang: $("room-write").value });
+    const url = await chatImage(file);
+    const blob = await (await fetch(url)).blob();
+    const photo = new File([blob], `foto-${file}`, { type: "image/jpeg" });
+    if (navigator.canShare && navigator.canShare({ files: [photo] })) {
+      await navigator.share({ files: [photo] });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = url; a.download = photo.name;
+    document.body.append(a); a.click(); a.remove();
+  } catch (e) {
+    if (e.name !== "AbortError") setStatus(e.message);
+  }
+}
+
+async function deleteChatMessage(msgId) {
+  if (!room || !window.confirm(t("Nachricht löschen? Sie verschwindet auch bei den anderen."))) return;
+  try {
+    const res = await fetch(`/api/chats/${room.id}/messages/${msgId}`, { method: "DELETE", headers: { "X-App-Password": password } });
+    if (!res.ok && res.status !== 404) throw new Error((await res.json().catch(() => ({}))).detail || t("Fehler {0}", res.status));
+    const el = roomBubble(msgId);
+    if (el) el.remove();
+    loadChats();
+  } catch (e) { setStatus(e.message); }
+}
+$("img-zoom").onclick = () => { $("img-zoom").hidden = true; };
+
+async function sendChat(body) {
+  if (!room) return false;
+  $("room-send").disabled = true;
+  let ok = false;
+  try {
+    await api(`/api/chats/${room.id}/messages`, { lang: $("room-write").value, ...body });
     $("room-text").value = "";
+    setStatus("");
+    ok = true;
     await poll();
   } catch (e) { setStatus(e.message); }
   $("room-send").disabled = false;
+  return ok;
+}
+// Foto erst als Vorschau zeigen; gesendet wird es mit „Senden“ (Text im Feld = Bildunterschrift)
+let pendingPhoto = null;
+function clearPhoto() {
+  pendingPhoto = null;
+  $("photo-preview").hidden = true;
+  $("photo-preview-img").removeAttribute("src");
+}
+$("photo-cancel").onclick = clearPhoto;
+
+$("room-send").onclick = async () => {
+  const text = $("room-text").value.trim();
+  if (pendingPhoto) {
+    const image = pendingPhoto;
+    setStatus("Foto wird gesendet …");
+    if (await sendChat({ image, text })) clearPhoto();
+  } else if (text) {
+    sendChat({ text });
+  }
+};
+$("room-file").onchange = async () => {
+  const file = $("room-file").files[0];
+  $("room-file").value = "";
+  if (!file || !room) return;
+  try {
+    pendingPhoto = await imageToBase64(file, CHAT_IMAGE_SIDE);
+    $("photo-preview-img").src = "data:image/jpeg;base64," + pendingPhoto;
+    $("photo-preview").hidden = false;
+    setStatus("");
+  } catch (e) { clearPhoto(); setStatus(e.message); }
 };
 
-function leaveRoom(notify = true) {
-  if (notify && room) fetch(`/api/rooms/${room}?cid=${cid}`, { method: "DELETE", headers: { "X-App-Password": password } }).catch(() => {});
-  room = null; stopPolling(); store.del("room"); bubbles.clear(); showRoom();
+// --- Push-Mitteilungen für neue Chat-Nachrichten ---
+let pushKey = null; // öffentlicher Server-Schlüssel, null = auf dem Server nicht eingerichtet
+const pushSupported = () => "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function keyBytes(b64) {
+  const raw = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
-$("room-leave").onclick = () => leaveRoom();
+
+async function currentSubscription() {
+  const reg = await navigator.serviceWorker.ready;
+  return reg.pushManager.getSubscription();
+}
+
+async function renderPush() {
+  $("push-box").hidden = !pushKey;
+  if (!pushKey) return;
+  $("push-btn").hidden = true;
+  if (!pushSupported()) {
+    $("push-hint").textContent = t(/iPhone|iPad/.test(navigator.userAgent) && !standalone()
+      ? "Mitteilungen gehen auf dem iPhone nur in der App vom Home-Bildschirm."
+      : "Dieses Gerät unterstützt keine Mitteilungen.");
+    return;
+  }
+  if (Notification.permission === "denied") {
+    $("push-hint").textContent = t("Mitteilungen sind blockiert. Bitte in den Einstellungen des Handys für diese App erlauben.");
+    return;
+  }
+  let sub = null;
+  try { sub = await currentSubscription(); } catch { /* Service Worker noch nicht bereit */ }
+  if (sub) {
+    // bei jedem Start erneut melden: falls der Server sie verloren hat oder sich jemand anderes angemeldet hat
+    api("/api/push/subscribe", sub.toJSON()).catch(() => {});
+    $("push-box").hidden = true; // eingeschaltet: Hinweis ausblenden, Ausschalten unter Einstellungen
+  } else {
+    $("push-hint").textContent = t("Bei neuen Nachrichten eine Mitteilung bekommen, auch wenn die App zu ist.");
+    $("push-btn").hidden = false;
+  }
+  $("push-off").hidden = !sub;
+}
+
+$("push-btn").onclick = async () => {
+  $("push-btn").disabled = true;
+  try {
+    // iOS fragt nur direkt nach einem Antippen
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") throw new Error(t("Mitteilungen wurden nicht erlaubt."));
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(pushKey) });
+    await api("/api/push/subscribe", sub.toJSON());
+    setStatus("Mitteilungen sind eingeschaltet.");
+  } catch (e) { setStatus(e.message); }
+  $("push-btn").disabled = false;
+  renderPush();
+};
+
+$("push-off").onclick = async () => {
+  try {
+    const sub = await currentSubscription();
+    if (sub) {
+      await api("/api/push/unsubscribe", { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }
+    setStatus("Mitteilungen sind ausgeschaltet.");
+  } catch (e) { setStatus(e.message); }
+  renderPush();
+};
+
+async function closeNotifications(chatId) {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    for (const n of await reg.getNotifications({ tag: chatId })) n.close();
+  } catch { /* ohne Service Worker nichts zu tun */ }
+}
+
+// Mitteilung angetippt: Chat öffnen (App war schon offen → Nachricht vom Service Worker, sonst ?chat= in der Adresse)
+function openChatFromNotice(chatId) {
+  if (!chatId) return;
+  store.set("chat-open", chatId);
+  if (room && room.id === chatId) { showTab("chat"); return; }
+  room = null; showRoom();
+  setMode("room");
+  showTab("chat");
+}
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.chat) openChatFromNotice(e.data.chat); });
+}
+
+$("room-leave").onclick = async () => {
+  if (!room || !window.confirm(t("Chat „{0}“ verlassen? Er verschwindet dann aus deiner Liste.", chatName(room)))) return;
+  try {
+    const res = await fetch(`/api/chats/${room.id}`, { method: "DELETE", headers: { "X-App-Password": password } });
+    if (!res.ok && res.status !== 404) throw new Error(t("Fehler {0}", res.status));
+  } catch (e) { setStatus(e.message); return; }
+  closeChat();
+};
 
 // --- Preisschild: Foto → Beträge → Euro ---
 function parsePrices(text) {
@@ -974,7 +1491,6 @@ if ("serviceWorker" in navigator) {
 }
 
 applyUi();
-$("tab-favs").querySelector("span").textContent = t("Favoriten/Einstellungen").replace("/", "/\u200b"); // darf nach dem Schrägstrich umbrechen
 renderHistory();
 updateControls();
 
@@ -986,3 +1502,5 @@ $("ui-lang").value = uiLang;
 $("ui-lang").onchange = () => { store.set("ui-lang", $("ui-lang").value); location.reload(); };
 
 init();
+window.appReady = true; // für die Selbstheilung in index.html: Script lief bis zum Ende
+try { sessionStorage.removeItem("recovered"); } catch { /* ignorieren */ }

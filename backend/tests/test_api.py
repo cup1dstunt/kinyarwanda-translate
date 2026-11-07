@@ -85,7 +85,7 @@ def test_convert(web, monkeypatch):
 def test_pwa_files_served(web):
     assert web.get("/manifest.json").status_code == 200
     assert web.get("/sw.js").status_code == 200
-    assert "Mukunzi Talk" in web.get("/").text
+    assert "<title>Ikiraro</title>" in web.get("/").text
 
 
 def test_health_shows_version(web, monkeypatch):
@@ -154,8 +154,14 @@ def test_provider_error_shows_google_message():
 def test_phrasebook_complete(web):
     phrases = web.get("/phrases.json").json()
     assert {p["c"] for p in phrases} >= {"Alltagssprache", "Arzt", "Behörde", "Einkaufen"}
-    for p in phrases:
+    dictionary = web.get("/dictionary.json").json()
+    assert len(dictionary) > 200
+    for p in phrases + dictionary:
         assert all(p.get(k, "").strip() for k in ("de", "fr", "en", "rw")), p
+    de = [p["de"] for p in phrases + dictionary]
+    assert len(de) == len(set(de))  # keine doppelten deutschen Einträge
+    entries = _i18n_entries()
+    assert [c for c in {p["c"] for p in phrases + dictionary} if c not in entries] == []
 
 
 def test_access_codes(web):
@@ -186,7 +192,13 @@ def test_translation_cache(web, monkeypatch):
     assert second["cached"] is True and calls == ["Hallo"]
 
 
-def test_room_chat_translates_per_reader(web, monkeypatch):
+def _two_people(web):
+    anna = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    ben = web.post("/api/admin/users", headers=H, json={"name": "Ben"}).json()["code"]
+    return {"X-App-Password": anna}, {"X-App-Password": ben}
+
+
+def test_chat_translates_per_reader(web, monkeypatch):
     calls = []
 
     class Fake:
@@ -195,59 +207,87 @@ def test_room_chat_translates_per_reader(web, monkeypatch):
             return f"[{target}] {text}"
 
     monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
-    a, b = "a" * 12, "b" * 12
-    code = web.post("/api/rooms", headers=H, json={"cid": a, "lang": "de"}).json()["room"]
-    assert web.post("/api/rooms", headers=H, json={"cid": b, "lang": "rw", "code": code.lower()}).status_code == 200
-    assert web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "Hallo"}).status_code == 200
-    got = web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H).json()
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"title": "Familie", "members": ["Ben"]}).json()
+    assert [m["name"] for m in chat["members"]] == ["Anna", "Ben"]
+    url = f"/api/chats/{chat['id']}/messages"
+    assert web.post(url, headers=ha, json={"lang": "de", "text": "Hallo"}).status_code == 200
+    listed = web.get("/api/chats", headers=hb).json()["chats"]
+    assert listed[0]["title"] == "Familie" and listed[0]["unread"] == 1 and listed[0]["last"]["text"] == "Hallo"
+    got = web.get(url, params={"lang": "rw"}, headers=hb).json()
     assert got["messages"][0]["text"] == "[rw] Hallo" and got["messages"][0]["original"] == "Hallo"
-    mine = web.get(f"/api/rooms/{code}/messages", params={"cid": a}, headers=H).json()["messages"][0]
+    assert got["messages"][0]["mine"] is False
+    assert web.get("/api/chats", headers=hb).json()["chats"][0]["unread"] == 0
+    mine = web.get(url, params={"lang": "de"}, headers=ha).json()["messages"][0]
     assert mine["mine"] is True and mine["text"] == "Hallo"
-    web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H)
+    web.get(url, params={"lang": "rw"}, headers=hb)
     assert calls == [("Hallo", "rw")]  # nur einmal übersetzt
-    later = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()
-    assert later["messages"] == [] and len(later["members"]) == 2
+    assert web.get(url, params={"lang": "rw", "after": 1}, headers=hb).json()["messages"] == []
 
 
-def test_room_write_language_single_translation_and_reactions(web, monkeypatch):
-    calls = []
+def test_chat_survives_restart(web, monkeypatch):
+    from backend import chats
 
-    class Fake:
-        def translate(self, text, source, target):
-            calls.append((text, source, target))
-            return f"[{source}>{target}] {text}"
-
-    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
-    a, b = "a" * 12, "b" * 12
-    code = web.post("/api/rooms", headers=H, json={"cid": a, "lang": "de"}).json()["room"]
-    web.post("/api/rooms", headers=H, json={"cid": b, "lang": "rw", "code": code})
-    # A liest Deutsch, schreibt aber Englisch; B bekommt Kinyarwanda aus dem englischen Original.
-    web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "Hello", "lang": "en"})
-    got = web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H).json()["messages"][0]
-    assert got["text"] == "[en>rw] Hello" and got["lang"] == "en"
-    # B lässt die Nachricht einzeln auf Englisch/Deutsch anzeigen: immer aus dem Original.
-    one = web.get(f"/api/rooms/{code}/messages/1/translation", params={"cid": b, "target": "de"}, headers=H).json()
-    assert one["text"] == "[en>de] Hello"
-    assert web.get(f"/api/rooms/{code}/messages/1/translation", params={"cid": b, "target": "en"}, headers=H).json()["text"] == "Hello"
-    assert all(src == "en" and txt == "Hello" for txt, src, _ in calls)
-    assert web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "x", "lang": "xx"}).status_code == 400
-    # Reaktionen: ein-/ausschalten, Zähler je Nachricht
-    r = lambda c, e: web.post(f"/api/rooms/{code}/messages/1/reactions", headers=H, json={"cid": c, "emoji": e})
-    assert r(a, "👍").status_code == 200 and r(b, "👍").status_code == 200 and r(b, "❤️").status_code == 200
-    rx = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()["reactions"]["1"]
-    assert {"emoji": "👍", "count": 2, "mine": True} in rx
-    r(b, "👍")
-    rx = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()["reactions"]["1"]
-    assert {"emoji": "👍", "count": 1, "mine": False} in rx
-    assert r(a, "💩").status_code == 404
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    web.post(f"/api/chats/{chat['id']}/messages", headers=ha, json={"lang": "de", "text": "Bis morgen"})
+    monkeypatch.setattr(chats, "_loaded_from", None)  # wie ein Neustart: von der Platte lesen
+    msgs = web.get(f"/api/chats/{chat['id']}/messages", params={"lang": "de"}, headers=hb).json()["messages"]
+    assert msgs[0]["text"] == "Bis morgen"
 
 
-def test_room_errors(web):
-    assert web.post("/api/rooms", headers=H, json={"cid": "c" * 12, "lang": "de", "code": "NOPE1"}).status_code == 404
-    assert web.post("/api/rooms", json={"cid": "c" * 12, "lang": "de"}).status_code == 401
-    code = web.post("/api/rooms", headers=H, json={"cid": "a" * 12, "lang": "de"}).json()["room"]
-    r = web.get(f"/api/rooms/{code}/messages", params={"cid": "z" * 12}, headers=H)
-    assert r.status_code == 404
+def test_chat_images(web):
+    import base64
+
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    jpeg = b"\xff\xd8\xff\xe0" + b"0" * 100
+    assert web.post(url, headers=ha, json={"lang": "de", "image": base64.b64encode(jpeg).decode()}).status_code == 200
+    msg = web.get(url, params={"lang": "rw"}, headers=hb).json()["messages"][0]
+    assert msg["image"] and msg["text"] == ""
+    img = web.get(f"/api/chats/{chat['id']}/images/{msg['image']}", headers=hb)
+    assert img.status_code == 200 and img.content == jpeg
+    assert web.get(f"/api/chats/{chat['id']}/images/{msg['image']}").status_code == 401
+    assert web.get(f"/api/chats/{chat['id']}/images/{msg['image']}", headers=H).status_code == 404  # nicht Mitglied
+    assert web.get(f"/api/chats/{chat['id']}/images/..%2Fx.json", headers=hb).status_code == 404
+    png = base64.b64encode(b"\x89PNG" + b"0" * 10).decode()
+    assert web.post(url, headers=ha, json={"lang": "de", "image": png}).status_code == 400
+    assert web.post(url, headers=ha, json={"lang": "de"}).status_code == 400
+
+
+def test_chat_delete_own_message(web):
+    import base64
+
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    jpeg = base64.b64encode(b"\xff\xd8\xff\xe0" + b"0" * 100).decode()
+    pic = web.post(url, headers=ha, json={"lang": "de", "image": jpeg}).json()["id"]
+    web.post(url, headers=hb, json={"lang": "de", "text": "Schön!"})
+    file = web.get(url, params={"lang": "de"}, headers=hb).json()["messages"][0]["image"]
+    assert web.delete(f"{url}/{pic}", headers=hb).status_code == 403  # fremde Nachricht
+    assert web.delete(f"{url}/{pic}", headers=ha).status_code == 200
+    assert web.delete(f"{url}/{pic}", headers=ha).status_code == 404
+    got = web.get(url, params={"lang": "de"}, headers=hb).json()
+    assert [m["text"] for m in got["messages"]] == ["Schön!"] and got["deleted"] == [pic]
+    assert web.get(f"/api/chats/{chat['id']}/images/{file}", headers=hb).status_code == 404
+
+
+def test_chat_errors_and_leave(web):
+    ha, hb = _two_people(web)
+    assert web.post("/api/chats", headers=ha, json={"members": []}).status_code == 400
+    assert web.post("/api/chats", headers=ha, json={"members": ["Niemand"]}).status_code == 400
+    assert web.post("/api/chats", json={"members": ["Ben"]}).status_code == 401
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    assert web.get(url, params={"lang": "de"}, headers=H).status_code == 404  # Admin ist nicht im Chat
+    assert web.get("/api/chats/nope/messages", params={"lang": "de"}, headers=ha).status_code == 404
+    assert web.delete(f"/api/chats/{chat['id']}", headers=ha).status_code == 200
+    assert web.get("/api/chats", headers=ha).json()["chats"] == []
+    assert len(web.get("/api/chats", headers=hb).json()["chats"]) == 1
+    assert web.delete(f"/api/chats/{chat['id']}", headers=hb).status_code == 200
+    assert web.get(url, params={"lang": "de"}, headers=hb).status_code == 404
 
 
 def test_vocab_lists(web, monkeypatch):
@@ -258,14 +298,25 @@ def test_vocab_lists(web, monkeypatch):
     monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
     body = {"title": "Markt", "source": "de", "target": "rw",
             "items": [{"a": "Wasser", "b": "amazi"}, {"a": "Brot"}, {"a": "  "}]}
-    made = web.post("/api/lists", headers=H, json=body).json()
-    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
     code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    made = web.post("/api/lists", headers=H, json={**body, "to": ["Anna"]}).json()
+    assert made["items"] == [{"a": "Wasser", "b": "amazi"}, {"a": "Brot", "b": "[rw] Brot"}]
     ha = {"X-App-Password": code}
     assert web.get("/api/lists", headers=ha).json()["lists"][0]["owner"] == "Admin"
+    assert web.get("/api/lists", headers=ha).json()["categories"][-1] == "Sonstiges"
+    assert made["category"] == "Sonstiges"
+    # Wörter ergänzen: nur Besitzer/Admin, Doppelte werden übersprungen, fehlende Übersetzung automatisch
+    more = {"items": [{"a": "wasser", "b": "x"}, {"a": "Milch"}]}
+    assert web.post(f"/api/lists/{made['id']}/items", headers=ha, json=more).status_code == 403
+    grown = web.post(f"/api/lists/{made['id']}/items", headers=H, json=more).json()
+    assert [i["a"] for i in grown["items"]] == ["Wasser", "Brot", "Milch"]
+    assert grown["items"][2]["b"] == "[rw] Milch"
+    assert web.post("/api/lists/nope/items", headers=H, json=more).status_code == 404
     assert web.delete(f"/api/lists/{made['id']}", headers=ha).status_code == 403  # fremde Liste
     assert web.post("/api/lists", headers=ha, json={**body, "title": ""}).status_code == 400
-    mine = web.post("/api/lists", headers=ha, json=body).json()
+    mine = web.post("/api/lists", headers=ha, json={**body, "category": "Essen & Einkaufen"}).json()
+    assert mine["category"] == "Essen & Einkaufen"
+    assert web.post("/api/lists", headers=ha, json={**body, "category": "Unsinn"}).json()["category"] == "Sonstiges"
     assert web.delete(f"/api/lists/{mine['id']}", headers=ha).status_code == 200
     assert web.delete(f"/api/lists/{made['id']}", headers=H).status_code == 200
     assert web.delete("/api/lists/nope", headers=H).status_code == 404
@@ -338,5 +389,189 @@ def test_i18n_covers_html_and_server_messages():
 
     main = (root / "backend" / "main.py").read_text(encoding="utf-8")
     messages = re.findall(r'HTTPException\(\d+, "([^"{]+)"\)', main)
-    messages += re.findall(r'raise RoomError\("([^"{]+)"\)', (root / "backend" / "rooms.py").read_text(encoding="utf-8"))
+    messages += re.findall(r'raise ChatError\("([^"{]+)"\)', (root / "backend" / "chats.py").read_text(encoding="utf-8"))
     assert [m for m in messages if m not in entries] == []
+
+
+def test_send_lists(web):
+    body = {"title": "Markt", "source": "de", "target": "rw", "items": [{"a": "Wasser", "b": "amazi"}]}
+    anna = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    ben = web.post("/api/admin/users", headers=H, json={"name": "Ben"}).json()["code"]
+    ha, hb = {"X-App-Password": anna}, {"X-App-Password": ben}
+    assert web.get("/api/people", headers=ha).json()["people"] == ["Admin", "Ben"]
+    mine = web.post("/api/lists", headers=ha, json={**body, "to": ["Ben", "Anna"]}).json()
+    assert mine["to"] == ["Ben"]  # sich selbst filtert er heraus
+    assert web.post("/api/lists", headers=ha, json={**body, "to": ["Niemand"]}).status_code == 400
+    private = web.post("/api/lists", headers=ha, json=body).json()
+    assert [x["id"] for x in web.get("/api/lists", headers=hb).json()["lists"]] == [mine["id"]]  # nur die gesendete
+    assert web.get("/api/lists", headers=H).json()["lists"] == []  # auch der Admin sieht fremde Listen nicht
+    # Empfänger darf nicht ergänzen, senden oder löschen, aber „entfernen“
+    assert web.post(f"/api/lists/{mine['id']}/items", headers=hb, json={"items": [{"a": "x", "b": "y"}]}).status_code == 403
+    assert web.post(f"/api/lists/{mine['id']}/share", headers=hb, json={"to": ["Admin"]}).status_code == 403
+    assert web.delete(f"/api/lists/{mine['id']}", headers=hb).status_code == 403
+    assert web.post(f"/api/lists/{private['id']}/leave", headers=hb).status_code == 404
+    shared = web.post(f"/api/lists/{private['id']}/share", headers=ha, json={"to": ["Admin"]}).json()
+    assert shared["to"] == ["Admin"]
+    assert len(web.get("/api/lists", headers=H).json()["lists"]) == 1
+    assert web.post(f"/api/lists/{mine['id']}/leave", headers=hb).status_code == 200
+    assert web.get("/api/lists", headers=hb).json()["lists"] == []
+
+def test_own_phrases(web, monkeypatch):
+    class Fake:
+        def translate(self, text, source, target):
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    r = web.post("/api/my-phrases", headers=H, json={"text": "Guten Appetit", "lang": "de", "category": "Essen"})
+    assert r.json() == {"added": 1}
+    mine = web.get("/api/my-phrases", headers=H).json()["phrases"]
+    assert mine[0]["de"] == "Guten Appetit" and mine[0]["rw"] == "[rw] Guten Appetit" and mine[0]["c"] == "Essen"
+    assert web.post("/api/my-phrases", headers=H, json={"text": "Guten Appetit", "lang": "de"}).json() == {"added": 0}
+    made = web.post("/api/lists", headers=H, json={"title": "T", "source": "de", "target": "rw",
+                                                   "items": [{"a": "Wasser", "b": "amazi"}]}).json()
+    assert web.post("/api/my-phrases/from-list", headers=H, json={"list_id": made["id"]}).json() == {"added": 1}
+    wasser = [p for p in web.get("/api/my-phrases", headers=H).json()["phrases"] if p["de"] == "Wasser"][0]
+    assert wasser["rw"] == "amazi" and wasser["fr"] == "[fr] Wasser"
+    assert web.post("/api/my-phrases/from-list", headers=H, json={"list_id": "nope"}).status_code == 404
+    code = web.post("/api/admin/users", headers=H, json={"name": "Anna"}).json()["code"]
+    assert web.get("/api/my-phrases", headers={"X-App-Password": code}).json()["phrases"] == []  # pro Person getrennt
+    assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 200
+    assert web.delete(f"/api/my-phrases/{wasser['id']}", headers=H).status_code == 404
+
+
+def test_static_files_are_revalidated(web):
+    # sonst hält iOS alte app.js fest und die App startet nach einem Update nicht
+    assert web.get("/app.js").headers["cache-control"] == "no-cache"
+    assert web.get("/").headers["cache-control"] == "no-cache"
+
+
+def _device():
+    """Ein simuliertes Handy: Schlüsselpaar und Auth-Geheimnis wie beim Browser-Abo."""
+    import base64
+    import os
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pub = key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    auth = os.urandom(16)
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()  # noqa: E731
+    sub = {"endpoint": "https://web.push.apple.com/abc" + b64(os.urandom(6)), "keys": {"p256dh": b64(pub), "auth": b64(auth)}}
+    return sub, key, auth
+
+
+@pytest.fixture
+def vapid(monkeypatch):
+    from backend import push
+
+    pub, priv = push.generate_keys()
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", pub)
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", priv)
+    return pub
+
+
+def test_push_encryption_roundtrip(vapid):
+    import http_ece
+
+    from backend import push
+
+    sub, key, auth = _device()
+    flat = {"endpoint": sub["endpoint"], **sub["keys"]}
+    body = push.encrypt(flat, b'{"title": "Anna"}')
+    assert http_ece.decrypt(body, private_key=key, auth_secret=auth, version="aes128gcm") == b'{"title": "Anna"}'
+    header = push._vapid_headers(sub["endpoint"])["Authorization"]
+    assert header.startswith("vapid t=") and header.endswith("k=" + vapid)
+
+
+def test_push_subscribe_rules(web, vapid):
+    assert web.get("/api/providers", headers=H).json()["push"] == vapid
+    sub, _, _ = _device()
+    assert web.post("/api/push/subscribe", headers=H, json=sub).status_code == 200
+    for bad in ("http://web.push.apple.com/x", "https://evil.example.com/x", "https://push.apple.com.evil.com/x"):
+        assert web.post("/api/push/subscribe", headers=H, json={**sub, "endpoint": bad}).status_code == 400
+    assert web.post("/api/push/subscribe", headers=H, json={**sub, "keys": {"p256dh": "x", "auth": "y"}}).status_code == 400
+    assert web.post("/api/push/subscribe", json=sub).status_code == 401
+
+
+def test_push_subject_is_app_address(web, vapid, monkeypatch):
+    from backend import push
+
+    sub, _, _ = _device()
+    web.post("/api/push/subscribe", headers={**H, "Origin": "https://uebersetzer.example.de"}, json=sub)
+    stored = [s for s in push._load() if s["endpoint"] == sub["endpoint"]][0]
+    assert stored["subject"] == "https://uebersetzer.example.de"
+    assert push._subject("http://localhost:8000").startswith("mailto:")  # Apple lehnt localhost ab
+    monkeypatch.setenv("VAPID_SUBJECT", "mailto:ich@example.de")
+    assert push._subject("https://uebersetzer.example.de") == "mailto:ich@example.de"
+
+
+def test_push_on_new_chat_message(web, vapid, monkeypatch):
+    import json
+
+    from backend import chats, push
+
+    class Fake:
+        def translate(self, text, source, target):
+            return f"[{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    sent = []
+
+    def deliver(sub, payload, client):
+        sent.append(json.loads(payload))
+        return 201
+
+    monkeypatch.setattr(push, "_deliver", deliver)
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"title": "Familie", "members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    web.get(url, params={"lang": "rw"}, headers=hb)  # Ben liest auf Kinyarwanda
+    sub, _, _ = _device()
+    assert web.post("/api/push/subscribe", headers=hb, json=sub).status_code == 200
+    chats._reading.clear()  # Ben hat den Chat geschlossen
+    web.post(url, headers=ha, json={"lang": "de", "text": "Hallo"})
+    assert sent == [{"title": "Anna · Familie", "body": "[rw] Hallo", "chat": chat["id"], "badge": 1}]
+    web.get(url, params={"lang": "rw"}, headers=hb)  # Ben hat den Chat offen: keine Mitteilung
+    web.post(url, headers=ha, json={"lang": "de", "text": "Bist du da?"})
+    assert len(sent) == 1
+    # abgemeldetes Gerät (410) wird entfernt
+    chats._reading.clear()
+    monkeypatch.setattr(push, "_deliver", lambda sub, payload, client: 410)
+    web.post(url, headers=ha, json={"lang": "de", "text": "Hallo?"})
+    assert not push.has_devices("Ben")
+
+
+def test_chat_write_language_single_translation_and_reactions(web, monkeypatch):
+    calls = []
+
+    class Fake:
+        def translate(self, text, source, target):
+            calls.append((text, source, target))
+            return f"[{source}>{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    # Anna liest Deutsch, schreibt Englisch; Ben bekommt Kinyarwanda aus dem englischen Original.
+    web.get(url, params={"lang": "de"}, headers=ha)
+    web.post(url, headers=ha, json={"lang": "en", "text": "Hello"})
+    mine = web.get(url, params={"lang": "de"}, headers=ha).json()["messages"][0]
+    assert mine["text"] == "Hello" and mine["mine"] is True and calls == []
+    got = web.get(url, params={"lang": "rw"}, headers=hb).json()["messages"][0]
+    assert got["text"] == "[en>rw] Hello"
+    # Einzelne Nachricht in anderer Sprache: immer aus dem Original
+    one = web.get(f"{url}/1/translation", params={"target": "de"}, headers=hb).json()
+    assert one["text"] == "[en>de] Hello"
+    assert web.get(f"{url}/1/translation", params={"target": "en"}, headers=hb).json()["text"] == "Hello"
+    assert all(src == "en" and txt == "Hello" for txt, src, _ in calls)
+    # Reaktionen ein-/ausschalten
+    react = lambda h, e: web.post(f"{url}/1/reactions", headers=h, json={"emoji": e})
+    assert react(ha, "👍").status_code == 200 and react(hb, "👍").status_code == 200
+    rx = web.get(url, params={"lang": "rw", "after": 1}, headers=hb).json()["reactions"]["1"]
+    assert {"emoji": "👍", "count": 2, "mine": True} in rx
+    react(hb, "👍")
+    rx = web.get(url, params={"lang": "rw", "after": 1}, headers=hb).json()["reactions"]["1"]
+    assert {"emoji": "👍", "count": 1, "mine": False} in rx
+    assert react(ha, "💩").status_code == 400
