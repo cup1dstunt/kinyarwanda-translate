@@ -540,3 +540,38 @@ def test_push_on_new_chat_message(web, vapid, monkeypatch):
     monkeypatch.setattr(push, "_deliver", lambda sub, payload, client: 410)
     web.post(url, headers=ha, json={"lang": "de", "text": "Hallo?"})
     assert not push.has_devices("Ben")
+
+
+def test_chat_write_language_single_translation_and_reactions(web, monkeypatch):
+    calls = []
+
+    class Fake:
+        def translate(self, text, source, target):
+            calls.append((text, source, target))
+            return f"[{source}>{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    ha, hb = _two_people(web)
+    chat = web.post("/api/chats", headers=ha, json={"members": ["Ben"]}).json()
+    url = f"/api/chats/{chat['id']}/messages"
+    # Anna liest Deutsch, schreibt Englisch; Ben bekommt Kinyarwanda aus dem englischen Original.
+    web.get(url, params={"lang": "de"}, headers=ha)
+    web.post(url, headers=ha, json={"lang": "en", "text": "Hello"})
+    mine = web.get(url, params={"lang": "de"}, headers=ha).json()["messages"][0]
+    assert mine["text"] == "Hello" and mine["mine"] is True and calls == []
+    got = web.get(url, params={"lang": "rw"}, headers=hb).json()["messages"][0]
+    assert got["text"] == "[en>rw] Hello"
+    # Einzelne Nachricht in anderer Sprache: immer aus dem Original
+    one = web.get(f"{url}/1/translation", params={"target": "de"}, headers=hb).json()
+    assert one["text"] == "[en>de] Hello"
+    assert web.get(f"{url}/1/translation", params={"target": "en"}, headers=hb).json()["text"] == "Hello"
+    assert all(src == "en" and txt == "Hello" for txt, src, _ in calls)
+    # Reaktionen ein-/ausschalten
+    react = lambda h, e: web.post(f"{url}/1/reactions", headers=h, json={"emoji": e})
+    assert react(ha, "👍").status_code == 200 and react(hb, "👍").status_code == 200
+    rx = web.get(url, params={"lang": "rw", "after": 1}, headers=hb).json()["reactions"]["1"]
+    assert {"emoji": "👍", "count": 2, "mine": True} in rx
+    react(hb, "👍")
+    rx = web.get(url, params={"lang": "rw", "after": 1}, headers=hb).json()["reactions"]["1"]
+    assert {"emoji": "👍", "count": 1, "mine": False} in rx
+    assert react(ha, "💩").status_code == 400

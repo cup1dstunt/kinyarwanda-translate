@@ -76,6 +76,8 @@ async function init() {
     myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
     $("room-lang").value = store.get("room-lang") || uiLang;
+    fill($("room-write"), info.languages, (l) => LANG_LABELS[l]);
+    $("room-write").value = store.get("room-write") || $("room-lang").value;
     if (store.get("chat-mode") === "room") setMode("room");
     startPolling();
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
@@ -1124,8 +1126,10 @@ function closeChat() {
 }
 $("room-back").onclick = closeChat;
 
+$("room-write").onchange = () => store.set("room-write", $("room-write").value);
 $("room-lang").onchange = () => {
   store.set("room-lang", chatLang());
+  $("room-write").value = chatLang(); store.set("room-write", chatLang()); // Schreibsprache folgt der Leseprache, bleibt aber änderbar
   if (room) openChat(room); // alles neu in der gewählten Sprache laden
 };
 
@@ -1160,6 +1164,7 @@ async function poll() {
       if (!roomBubble(m.id)) addRoomBubble(m);
       lastId = Math.max(lastId, m.id);
     }
+    updateReactions(r.reactions || {});
     for (const gone of r.deleted || []) { const el = roomBubble(gone); if (el) el.remove(); }
     if (r.messages.length) loadChats(); // gelesen: Abzeichen und Liste aktualisieren
   } catch (e) {
@@ -1211,17 +1216,64 @@ function addRoomBubble(m) {
       orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
       div.append(orig);
     }
-    const lang = m.mine ? m.lang : chatLang();
-    row.append(
-      mkBtn("#i-speaker", "Vorlesen", () => speakAny(m.text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
-      mkBtn("#i-expand", "Groß anzeigen", () => zoom(m.text)),
-    );
+    let shownLang = m.mine ? m.lang : chatLang();
+    const speak = mkBtn("#i-speaker", "Vorlesen", () => speakAny(big.textContent, shownLang, ""), !(serverTts || synth) || !SPEECH_TAGS[shownLang]);
+    row.append(speak, mkBtn("#i-expand", "Groß anzeigen", () => zoom(big.textContent)));
+    // Zielsprache nur für diese Nachricht; übersetzt wird immer das Original, nie eine Übersetzung
+    const pick = document.createElement("select");
+    pick.className = "mini";
+    pick.setAttribute("aria-label", t("Sprache dieser Nachricht"));
+    pick.append(new Option("🌐 " + t("Sprache"), ""));
+    for (const l of Object.keys(LANG_LABELS)) pick.append(new Option(LANG_LABELS[l], l));
+    pick.onchange = async () => {
+      const target = pick.value || (m.mine ? m.lang : chatLang());
+      try {
+        const standard = !pick.value || target === (m.mine ? m.lang : chatLang());
+        const r = standard ? { text: m.text } : await api(`/api/chats/${room.id}/messages/${m.id}/translation?target=${target}`);
+        big.textContent = r.text; shownLang = target;
+        speak.disabled = !(serverTts || synth) || !SPEECH_TAGS[target];
+        setStatus("");
+      } catch (e) { setStatus(e.message); }
+    };
+    row.append(pick);
   }
+  const picker = document.createElement("div");
+  picker.className = "chips"; picker.hidden = true;
+  for (const e of REACTIONS) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = e;
+    b.onclick = () => { picker.hidden = true; toggleReaction(m.id, e); };
+    picker.append(b);
+  }
+  const react = document.createElement("button");
+  react.className = "icon"; react.textContent = "☺"; react.title = t("Reagieren"); react.setAttribute("aria-label", t("Reagieren"));
+  react.onclick = () => { picker.hidden = !picker.hidden; };
+  row.append(react);
   if (m.image) row.append(mkBtn("#i-download", "Foto speichern", () => saveChatImage(m.image)));
   if (m.mine) row.append(mkBtn("#i-trash", "Nachricht löschen", () => deleteChatMessage(m.id)));
-  div.append(row);
+  const chips = document.createElement("div");
+  chips.className = "chips"; chips.dataset.chips = m.id;
+  div.append(row, picker, chips);
   $("room-log").append(div);
   if (!typing()) div.scrollIntoView({ block: "nearest" });
+}
+
+const REACTIONS = ["👍", "❤️", "😂", "😮", "🙏"];
+
+async function toggleReaction(msgId, emoji) {
+  try { await api(`/api/chats/${room.id}/messages/${msgId}/reactions`, { emoji }); await poll(); } catch (e) { setStatus(e.message); }
+}
+
+function updateReactions(all) {
+  for (const box of $("room-log").querySelectorAll("[data-chips]")) {
+    box.replaceChildren(...(all[box.dataset.chips] || []).map((r) => {
+      const c = document.createElement("button");
+      c.className = "chip" + (r.mine ? " mine" : "");
+      c.textContent = r.count > 1 ? `${r.emoji} ${r.count}` : r.emoji;
+      c.onclick = () => toggleReaction(Number(box.dataset.chips), r.emoji);
+      return c;
+    }));
+  }
 }
 
 // Foto aufs Handy: auf dem iPhone über das Teilen-Menü („Bild sichern“), sonst als Download
@@ -1259,7 +1311,7 @@ async function sendChat(body) {
   $("room-send").disabled = true;
   let ok = false;
   try {
-    await api(`/api/chats/${room.id}/messages`, { lang: chatLang(), ...body });
+    await api(`/api/chats/${room.id}/messages`, { lang: $("room-write").value, ...body });
     $("room-text").value = "";
     setStatus("");
     ok = true;

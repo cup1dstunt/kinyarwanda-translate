@@ -95,6 +95,10 @@ class ChatMessage(BaseModel):
     image: str = ""  # JPEG als Base64 ohne "data:"-Präfix
 
 
+class ChatReaction(BaseModel):
+    emoji: str
+
+
 class TranslateRequest(BaseModel):
     text: str
     source: str
@@ -433,6 +437,19 @@ def chat_fetch(chat_id: str, lang: str, after: int = 0, user: users.User = Depen
     if lang not in LANGUAGES:
         raise HTTPException(400, "Ungültige Sprachwahl")
     return _chat_call(chats.fetch, chat_id, user.name, lang, after, lambda t, s_, g: translate_text(t, s_, g)[0])
+
+
+@app.get("/api/chats/{chat_id}/messages/{msg_id}/translation")
+def chat_translate_one(chat_id: str, msg_id: int, target: str, user: users.User = Depends(require_password)):
+    if target not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    return _chat_call(chats.translate_one, chat_id, user.name, msg_id, target, lambda t, s_, g: translate_text(t, s_, g)[0])
+
+
+@app.post("/api/chats/{chat_id}/messages/{msg_id}/reactions")
+def chat_react(chat_id: str, msg_id: int, req: ChatReaction, user: users.User = Depends(require_password)):
+    _chat_call(chats.react, chat_id, user.name, msg_id, req.emoji)
+    return {"ok": True}
 
 
 @app.delete("/api/chats/{chat_id}/messages/{msg_id}")

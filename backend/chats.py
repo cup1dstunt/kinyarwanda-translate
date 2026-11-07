@@ -28,6 +28,9 @@ _reading: dict[tuple[str, str], float] = {}  # (Chat, Person) -> letzte Abfrage;
 READING_SECONDS = 15
 
 
+REACTIONS = ("👍", "❤️", "😂", "😮", "🙏")
+
+
 class ChatError(Exception):
     pass
 
@@ -149,8 +152,7 @@ def post(chat_id: str, name: str, lang: str, text: str, image_base64: str = "") 
             if old.get("image"):
                 (_dir() / chat_id / old["image"]).unlink(missing_ok=True)
         del chat["messages"][:-MAX_MESSAGES]
-        chat["members"][name]["lang"] = lang
-        chat["touched"] = time.time()
+        chat["touched"] = time.time()  # Leselaut des Mitglieds ändert nur fetch(); lang ist hier die Schreibsprache
         _save(chat)
         return msg
 
@@ -227,7 +229,7 @@ def fetch(chat_id: str, name: str, lang: str, after: int, translate: Callable[[s
     with _lock:
         chat = _get(chat_id, name)
         todo = [(m["id"], m["text"], m["lang"]) for m in chat["messages"]
-                if m["id"] > after and m["text"] and m["lang"] != lang and lang not in m["tr"]]
+                if m["id"] > after and m["text"] and m["name"] != name and m["lang"] != lang and lang not in m["tr"]]
     done = {}
     for msg_id, text, source in todo:
         try:
@@ -242,8 +244,9 @@ def fetch(chat_id: str, name: str, lang: str, after: int, translate: Callable[[s
                 msg["tr"][lang] = done[msg["id"]]
             if msg["id"] <= after:
                 continue
-            shown = msg["text"] if msg["lang"] == lang else msg["tr"].get(lang, msg["text"])
-            out.append({"id": msg["id"], "mine": msg["name"] == name, "name": msg["name"], "lang": msg["lang"],
+            mine = msg["name"] == name
+            shown = msg["text"] if mine or msg["lang"] == lang else msg["tr"].get(lang, msg["text"])
+            out.append({"id": msg["id"], "mine": mine, "name": msg["name"], "lang": msg["lang"],
                         "original": msg["text"], "text": shown, "image": msg.get("image"), "time": msg["time"]})
         me = chat["members"][name]
         last_id = chat["messages"][-1]["id"] if chat["messages"] else 0
@@ -251,4 +254,42 @@ def fetch(chat_id: str, name: str, lang: str, after: int, translate: Callable[[s
         me["seen"], me["lang"] = max(me.get("seen", 0), last_id), lang
         if changed:
             _save(chat)
-        return {"messages": out, "deleted": chat.get("deleted", []), "chat": _summary(chat, name)}
+        reactions = {str(m["id"]): [{"emoji": e, "count": len(who), "mine": name in who} for e, who in m["rx"].items() if who]
+                     for m in chat["messages"] if any(m.get("rx", {}).values())}
+        return {"messages": out, "deleted": chat.get("deleted", []), "chat": _summary(chat, name), "reactions": reactions}
+
+
+def translate_one(chat_id: str, name: str, msg_id: int, target: str, translate: Callable[[str, str, str], str]) -> dict:
+    """Eine Nachricht in einer gewählten Sprache. Ausgangspunkt ist immer das Original, nie eine Übersetzung."""
+    with _lock:
+        msg = next((m for m in _get(chat_id, name)["messages"] if m["id"] == msg_id), None)
+        if msg is None or not msg["text"]:
+            raise ChatError("Nachricht nicht gefunden")
+        text, source, cached = msg["text"], msg["lang"], msg["tr"].get(target)
+    if source == target:
+        return {"text": text}
+    if cached is None:
+        cached = translate(text, source, target)
+        with _lock:
+            chat = _get(chat_id, name)
+            if msg in chat["messages"]:
+                msg["tr"][target] = cached
+                _save(chat)
+    return {"text": cached}
+
+
+def react(chat_id: str, name: str, msg_id: int, emoji: str) -> None:
+    """Schaltet die Reaktion des Mitglieds auf eine Nachricht ein bzw. aus."""
+    if emoji not in REACTIONS:
+        raise ChatError("Reaktion nicht erlaubt")
+    with _lock:
+        chat = _get(chat_id, name)
+        msg = next((m for m in chat["messages"] if m["id"] == msg_id), None)
+        if msg is None:
+            raise ChatError("Nachricht nicht gefunden")
+        who = msg.setdefault("rx", {}).setdefault(emoji, [])
+        if name in who:
+            who.remove(name)
+        else:
+            who.append(name)
+        _save(chat)
