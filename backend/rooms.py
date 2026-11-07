@@ -80,12 +80,16 @@ def leave(code: str, cid: str) -> None:
             _rooms.pop(room.code, None)
 
 
-def post(room: Room, cid: str, text: str) -> dict:
+REACTIONS = ("👍", "❤️", "😂", "😮", "🙏")
+
+
+def post(room: Room, cid: str, text: str, lang: str | None = None) -> dict:
+    """Speichert die Originalnachricht. `lang` ist die Schreibsprache (Standard: Sprache des Absenders)."""
     with room.lock:
         member = room.members.get(cid)
         if member is None:
             raise RoomError("Du bist nicht (mehr) in diesem Raum")
-        msg = {"id": room.next_id, "cid": cid, "name": member["name"], "lang": member["lang"], "text": text, "tr": {}}
+        msg = {"id": room.next_id, "cid": cid, "name": member["name"], "lang": lang or member["lang"], "text": text, "tr": {}, "rx": {}}
         room.next_id += 1
         room.messages.append(msg)
         del room.messages[:-MAX_MESSAGES]
@@ -105,11 +109,49 @@ def fetch(room: Room, cid: str, after: int, translate: Callable[[str, str, str],
         for msg in room.messages:
             if msg["id"] <= after:
                 continue
-            shown = msg["text"] if msg["lang"] == lang else msg["tr"].get(lang)
+            mine = msg["cid"] == cid
+            shown = msg["text"] if mine or msg["lang"] == lang else msg["tr"].get(lang)
             if shown is None:
-                shown = translate(msg["text"], msg["lang"], lang)
+                shown = translate(msg["text"], msg["lang"], lang)  # immer aus dem Original, nie aus einer Übersetzung
                 msg["tr"][lang] = shown
-            out.append({"id": msg["id"], "mine": msg["cid"] == cid, "name": msg["name"], "lang": msg["lang"],
+            out.append({"id": msg["id"], "mine": mine, "name": msg["name"], "lang": msg["lang"],
                         "original": msg["text"], "text": shown})
         members = [{"name": m["name"], "lang": m["lang"]} for m in room.members.values()]
-    return {"messages": out, "members": members}
+        reactions = {
+            str(msg["id"]): [{"emoji": e, "count": len(c), "mine": cid in c} for e, c in msg["rx"].items() if c]
+            for msg in room.messages if any(msg["rx"].values())
+        }
+    return {"messages": out, "members": members, "reactions": reactions}
+
+
+def translate_one(room: Room, cid: str, msg_id: int, target: str, translate: Callable[[str, str, str], str]) -> dict:
+    """Eine einzelne Nachricht in einer gewählten Sprache. Ausgangspunkt ist immer das Original."""
+    with room.lock:
+        if cid not in room.members:
+            raise RoomError("Du bist nicht (mehr) in diesem Raum")
+        msg = next((m for m in room.messages if m["id"] == msg_id), None)
+        if msg is None:
+            raise RoomError("Nachricht nicht gefunden")
+        room.touched = time.time()
+        if msg["lang"] == target:
+            return {"text": msg["text"]}
+        shown = msg["tr"].get(target)
+        if shown is None:
+            shown = translate(msg["text"], msg["lang"], target)
+            msg["tr"][target] = shown
+        return {"text": shown}
+
+
+def react(room: Room, cid: str, msg_id: int, emoji: str) -> None:
+    """Schaltet die Reaktion des Mitglieds auf eine Nachricht ein bzw. aus."""
+    if emoji not in REACTIONS:
+        raise RoomError("Reaktion nicht erlaubt")
+    with room.lock:
+        if cid not in room.members:
+            raise RoomError("Du bist nicht (mehr) in diesem Raum")
+        msg = next((m for m in room.messages if m["id"] == msg_id), None)
+        if msg is None:
+            raise RoomError("Nachricht nicht gefunden")
+        who = msg["rx"].setdefault(emoji, set())
+        who.symmetric_difference_update({cid})
+        room.touched = time.time()

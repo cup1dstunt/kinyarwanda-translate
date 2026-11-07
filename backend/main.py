@@ -49,6 +49,12 @@ class RoomJoin(BaseModel):
 class RoomMessage(BaseModel):
     cid: str
     text: str
+    lang: str | None = None  # Schreibsprache dieser Nachricht (Standard: Sprache des Absenders)
+
+
+class RoomReaction(BaseModel):
+    cid: str
+    emoji: str
 
 
 class TranslateRequest(BaseModel):
@@ -227,8 +233,10 @@ def room_post(code: str, req: RoomMessage):
         raise HTTPException(400, "Kein Text")
     if len(text) > max_input_chars():
         raise HTTPException(413, f"Text zu lang (max. {max_input_chars()} Zeichen)")
+    if req.lang is not None and req.lang not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Anfrage")
     room = _room_call(rooms.get, code)
-    msg = _room_call(rooms.post, room, req.cid, text)
+    msg = _room_call(rooms.post, room, req.cid, text, req.lang)
     return {"id": msg["id"]}
 
 
@@ -236,6 +244,21 @@ def room_post(code: str, req: RoomMessage):
 def room_fetch(code: str, cid: str, after: int = 0):
     room = _room_call(rooms.get, code)
     return _room_call(rooms.fetch, room, cid, after, lambda t, s_, g: translate_text(t, s_, g)[0])
+
+
+@app.get("/api/rooms/{code}/messages/{msg_id}/translation", dependencies=[Depends(require_password)])
+def room_translate_one(code: str, msg_id: int, cid: str, target: str):
+    if target not in LANGUAGES:
+        raise HTTPException(400, "Ungültige Sprachwahl")
+    room = _room_call(rooms.get, code)
+    return _room_call(rooms.translate_one, room, cid, msg_id, target, lambda t, s_, g: translate_text(t, s_, g)[0])
+
+
+@app.post("/api/rooms/{code}/messages/{msg_id}/reactions", dependencies=[Depends(require_password)])
+def room_react(code: str, msg_id: int, req: RoomReaction):
+    room = _room_call(rooms.get, code)
+    _room_call(rooms.react, room, req.cid, msg_id, req.emoji)
+    return {"ok": True}
 
 
 @app.delete("/api/rooms/{code}", dependencies=[Depends(require_password)])

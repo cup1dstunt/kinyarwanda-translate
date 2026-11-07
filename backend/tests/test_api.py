@@ -209,6 +209,39 @@ def test_room_chat_translates_per_reader(web, monkeypatch):
     assert later["messages"] == [] and len(later["members"]) == 2
 
 
+def test_room_write_language_single_translation_and_reactions(web, monkeypatch):
+    calls = []
+
+    class Fake:
+        def translate(self, text, source, target):
+            calls.append((text, source, target))
+            return f"[{source}>{target}] {text}"
+
+    monkeypatch.setattr("backend.main.available_providers", lambda: {"google": Fake()})
+    a, b = "a" * 12, "b" * 12
+    code = web.post("/api/rooms", headers=H, json={"cid": a, "lang": "de"}).json()["room"]
+    web.post("/api/rooms", headers=H, json={"cid": b, "lang": "rw", "code": code})
+    # A liest Deutsch, schreibt aber Englisch; B bekommt Kinyarwanda aus dem englischen Original.
+    web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "Hello", "lang": "en"})
+    got = web.get(f"/api/rooms/{code}/messages", params={"cid": b}, headers=H).json()["messages"][0]
+    assert got["text"] == "[en>rw] Hello" and got["lang"] == "en"
+    # B lässt die Nachricht einzeln auf Englisch/Deutsch anzeigen: immer aus dem Original.
+    one = web.get(f"/api/rooms/{code}/messages/1/translation", params={"cid": b, "target": "de"}, headers=H).json()
+    assert one["text"] == "[en>de] Hello"
+    assert web.get(f"/api/rooms/{code}/messages/1/translation", params={"cid": b, "target": "en"}, headers=H).json()["text"] == "Hello"
+    assert all(src == "en" and txt == "Hello" for txt, src, _ in calls)
+    assert web.post(f"/api/rooms/{code}/messages", headers=H, json={"cid": a, "text": "x", "lang": "xx"}).status_code == 400
+    # Reaktionen: ein-/ausschalten, Zähler je Nachricht
+    r = lambda c, e: web.post(f"/api/rooms/{code}/messages/1/reactions", headers=H, json={"cid": c, "emoji": e})
+    assert r(a, "👍").status_code == 200 and r(b, "👍").status_code == 200 and r(b, "❤️").status_code == 200
+    rx = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()["reactions"]["1"]
+    assert {"emoji": "👍", "count": 2, "mine": True} in rx
+    r(b, "👍")
+    rx = web.get(f"/api/rooms/{code}/messages", params={"cid": b, "after": 1}, headers=H).json()["reactions"]["1"]
+    assert {"emoji": "👍", "count": 1, "mine": False} in rx
+    assert r(a, "💩").status_code == 404
+
+
 def test_room_errors(web):
     assert web.post("/api/rooms", headers=H, json={"cid": "c" * 12, "lang": "de", "code": "NOPE1"}).status_code == 404
     assert web.post("/api/rooms", json={"cid": "c" * 12, "lang": "de"}).status_code == 401

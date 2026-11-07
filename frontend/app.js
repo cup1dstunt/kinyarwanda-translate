@@ -74,6 +74,7 @@ async function init() {
     myName = info.me ? info.me.name : "";
     myAdmin = !!(info.me && info.me.admin);
     fill($("room-lang"), info.languages, (l) => LANG_LABELS[l]);
+    fill($("room-write"), info.languages, (l) => LANG_LABELS[l]);
     $("room-lang").value = store.get("room-lang") || uiLang;
     resumeRoom();
     fill($("conv-a"), info.languages, (l) => LANG_LABELS[l]);
@@ -800,7 +801,8 @@ async function enterRoom(code) {
     const r = await api("/api/rooms", { cid, lang, code: code || null });
     room = r.room; lastId = 0;
     store.set("room", JSON.stringify({ room, lang }));
-    $("room-log").replaceChildren();
+    $("room-log").replaceChildren(); bubbles.clear();
+    $("room-write").value = lang;
     showRoom(); startPolling(); setStatus("");
   } catch (e) { setStatus(e.message); }
 }
@@ -813,7 +815,7 @@ function resumeRoom() {
   if (!saved || room) return;
   $("room-lang").value = saved.lang;
   api("/api/rooms", { cid, lang: saved.lang, code: saved.room }).then((r) => {
-    room = r.room; lastId = 0; showRoom(); setMode("room");
+    room = r.room; lastId = 0; $("room-write").value = saved.lang; showRoom(); setMode("room");
   }).catch(() => store.del("room"));
 }
 
@@ -823,12 +825,15 @@ async function poll() {
     const r = await api(`/api/rooms/${room}/messages?cid=${cid}&after=${lastId}`);
     $("room-members").textContent = r.members.map((m) => `${m.name} (${LANG_LABELS[m.lang]})`).join(", ");
     for (const m of r.messages) { addRoomBubble(m); lastId = Math.max(lastId, m.id); }
+    updateReactions(r.reactions || {});
   } catch (e) {
     setStatus(e.message);
     if (/Raum|nicht/.test(e.message)) leaveRoom(false);
     else { stopPolling(); setTimeout(() => { if (room) startPolling(); }, 10000); } // bei Fehlern nicht im 2-s-Takt wiederholen
   }
 }
+
+const bubbles = new Map(); // Nachrichten-ID -> {chips, reactions}
 
 function addRoomBubble(m) {
   const div = document.createElement("div");
@@ -839,21 +844,74 @@ function addRoomBubble(m) {
   big.className = "big-text";
   big.textContent = m.text;
   div.append(who, big);
-  if (!m.mine && m.original !== m.text) {
-    const orig = document.createElement("small");
-    orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
-    div.append(orig);
-  }
+  const orig = document.createElement("small");
+  orig.textContent = `${LANG_LABELS[m.lang]}: ${m.original}`;
+  orig.hidden = m.original === m.text;
+  div.append(orig);
+  let shownLang = $("room-lang").value;
   const row = document.createElement("div");
   row.className = "fav-actions";
-  const lang = $("room-lang").value;
-  row.append(
-    mkBtn("#i-speaker", "Vorlesen", () => speakAny(m.text, lang, ""), !(serverTts || synth) || !SPEECH_TAGS[lang]),
-    mkBtn("#i-expand", "Groß anzeigen", () => zoom(m.text)),
-  );
-  div.append(row);
+  const speak = mkBtn("#i-speaker", "Vorlesen", () => speakAny(big.textContent, shownLang, ""), !(serverTts || synth) || !SPEECH_TAGS[shownLang]);
+  // Zielsprache nur für diese eine Nachricht; übersetzt wird immer das Original, nie eine Übersetzung.
+  const pick = document.createElement("select");
+  pick.className = "mini";
+  pick.setAttribute("aria-label", t("Sprache dieser Nachricht"));
+  const first = document.createElement("option");
+  first.value = ""; first.textContent = "🌐 " + t("Sprache");
+  pick.append(first);
+  for (const l of Object.keys(LANG_LABELS)) {
+    const o = document.createElement("option");
+    o.value = l; o.textContent = LANG_LABELS[l];
+    pick.append(o);
+  }
+  pick.onchange = async () => {
+    const target = pick.value || $("room-lang").value;
+    try {
+      const r = pick.value ? await api(`/api/rooms/${room}/messages/${m.id}/translation?cid=${cid}&target=${target}`) : { text: m.text };
+      big.textContent = r.text; shownLang = target;
+      orig.hidden = target === m.lang;
+      speak.disabled = !(serverTts || synth) || !SPEECH_TAGS[target];
+      setStatus("");
+    } catch (e) { setStatus(e.message); }
+  };
+  const chips = document.createElement("div");
+  chips.className = "chips";
+  const picker = document.createElement("div");
+  picker.className = "chips"; picker.hidden = true;
+  for (const e of REACTIONS) {
+    const b = document.createElement("button");
+    b.className = "chip"; b.textContent = e;
+    b.onclick = async () => {
+      picker.hidden = true;
+      try { await api(`/api/rooms/${room}/messages/${m.id}/reactions`, { cid, emoji: e }); await poll(); } catch (err) { setStatus(err.message); }
+    };
+    picker.append(b);
+  }
+  const react = document.createElement("button");
+  react.className = "icon"; react.textContent = "☺"; react.title = t("Reagieren"); react.setAttribute("aria-label", t("Reagieren"));
+  react.onclick = () => { picker.hidden = !picker.hidden; };
+  row.append(speak, mkBtn("#i-expand", "Groß anzeigen", () => zoom(big.textContent)), pick, react);
+  div.append(row, picker, chips);
+  bubbles.set(m.id, { chips });
   $("room-log").append(div);
   if (!typing()) div.scrollIntoView({ block: "nearest" });
+}
+
+const REACTIONS = ["👍", "❤️", "😂", "😮", "🙏"];
+
+function updateReactions(all) {
+  for (const [id, b] of bubbles) {
+    b.chips.replaceChildren();
+    for (const r of all[id] || []) {
+      const c = document.createElement("button");
+      c.className = "chip" + (r.mine ? " mine" : "");
+      c.textContent = r.count > 1 ? `${r.emoji} ${r.count}` : r.emoji;
+      c.onclick = async () => {
+        try { await api(`/api/rooms/${room}/messages/${id}/reactions`, { cid, emoji: r.emoji }); await poll(); } catch (err) { setStatus(err.message); }
+      };
+      b.chips.append(c);
+    }
+  }
 }
 
 $("room-send").onclick = async () => {
@@ -861,7 +919,7 @@ $("room-send").onclick = async () => {
   if (!text || !room) return;
   $("room-send").disabled = true;
   try {
-    await api(`/api/rooms/${room}/messages`, { cid, text });
+    await api(`/api/rooms/${room}/messages`, { cid, text, lang: $("room-write").value });
     $("room-text").value = "";
     await poll();
   } catch (e) { setStatus(e.message); }
@@ -870,7 +928,7 @@ $("room-send").onclick = async () => {
 
 function leaveRoom(notify = true) {
   if (notify && room) fetch(`/api/rooms/${room}?cid=${cid}`, { method: "DELETE", headers: { "X-App-Password": password } }).catch(() => {});
-  room = null; stopPolling(); store.del("room"); showRoom();
+  room = null; stopPolling(); store.del("room"); bubbles.clear(); showRoom();
 }
 $("room-leave").onclick = () => leaveRoom();
 

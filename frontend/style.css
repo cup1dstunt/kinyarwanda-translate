@@ -211,3 +211,9 @@ footer { text-align: center; }
 
 /* iOS-Tastatur: Tab-Leiste weg, solange ein Feld fokussiert ist */
 body.typing .tabbar { display: none; }
+
+.bubble select.mini { min-height: 32px; padding: 0 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font-size: .85rem; margin: 4px 4px 4px 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 6px; }
+.chips:empty { display: none; }
+.chip { min-height: 30px; padding: 0 8px; border-radius: 15px; border: 1px solid var(--line); background: var(--card); font-size: 1rem; }
+.chip.mine { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, var(--card)); }
